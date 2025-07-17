@@ -1,41 +1,50 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
+<nav class="navbar navbar-expand-lg navbar-light bg-light" style="--bs-nav-underline-color: transparent;">
     <div class="container">
-        <a class="navbar-brand" href="{% url 'home' %}">Бронирование столиков</a>
+        {# --- ЛЕВАЯ ЧАСТЬ: НАИМЕНОВАНИЕ РЕСТОРАНА --- #}
+        <a class="navbar-brand" href="{% url 'home' %}">
+            <ins>и</ins> <i class="fas fa-fish"></i> РЫБА <ins>и</ins> <i class="fas fa-drumstick-bite"></i> МЯСО
+        </a>
+
+        {# --- КНОПКА ДЛЯ МОБИЛЬНОЙ ВЕРСИИ --- #}
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
+        {# --- ЦЕНТРАЛЬНАЯ И ПРАВАЯ ЧАСТИ --- #}
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
+            <ul class="navbar-nav mx-auto"> {# mx-auto для центрирования элементов #}
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
-                       aria-current="page"
-                       href="{% url 'home' %}">Главная</a>
+                    <a class="btn btn-outline-secondary" style="min-width: 8em;"
+                       href="{% url 'home' %}"><i class="fas fa-home"></i> Главная</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'restaurant_list' %}active{% endif %}"
-                       href="{% url 'restaurant_list' %}">Рестораны</a>
+                    <a class="btn btn-outline-secondary" style="min-width: 8em;"
+                       href="{% url 'restaurant_list' %}"><i class="fas fa-utensils"></i> Рестораны</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'bookings' %}active{% endif %}"
-                       href="{% url 'bookings' %}">Бронирования</a>
+                    <a class="btn btn-outline-secondary" style="min-width: 8em;"
+                       href="{% url 'bookings' %}"><i class="fas fa-calendar-check"></i> Бронирования</a>
                 </li>
+            </ul>
+
+            <ul class="navbar-nav ms-auto"> {# ms-auto для выравнивания вправо #}
                 {# --- ССЫЛКИ НА ВХОД/ВЫХОД --- #}
                 {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'logout' %}">Выйти</a>
+                        <a class="btn btn-danger" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Выйти</a>
                     </li>
                 {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'login' %}">Войти</a>
+                        <a class="btn btn-success" href="{% url 'login' %}"><i class="fas fa-sign-in-alt"></i> Войти</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'register' %}">Регистрация</a>
+                        <a class="btn btn-primary" href="{% url 'register' %}"><i class="fas fa-user-plus"></i> Регистрация</a>
                     </li>
                 {% endif %}
 
                 {# --- КНОПКА ПЕРЕКЛЮЧЕНИЯ ТЕМЫ --- #}
                 <li class="nav-item">
-                    <button id="theme-toggle" class="btn btn-outline-secondary btn-sm ms-2">Темная тема</button>
+                    <button id="theme-toggle" class="btn btn-outline-secondary ms-2">Темная тема</button>
                 </li>
             </ul>
         </div>
