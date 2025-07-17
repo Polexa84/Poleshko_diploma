@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная страница{% endblock %}
+
+{% block content %}
+    <h1>Добро пожаловать на сайт бронирования столиков!</h1>
+    <p>Здесь вы можете найти лучшие рестораны и забронировать столик на удобное для вас время.</p>
+    <a href="{% url 'restaurant_list' %}" class="btn btn-primary">Посмотреть рестораны</a>
+{% endblock %}

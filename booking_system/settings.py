@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'tables',
     'bookings',
     'users',
+    'widget_tweaks',
 ]
 
 MIDDLEWARE = [
