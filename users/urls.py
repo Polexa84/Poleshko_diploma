@@ -8,8 +8,8 @@ urlpatterns = [
     path('register/', views.register, name='register'),
 
     # URL для входа
-    path('login/', auth_views.LoginView.as_view(template_name='users/login.html'), name='login'), # <--- Вот этот URL
+    path('login/', auth_views.LoginView.as_view(template_name='users/login.html'), name='login'),
 
     # URL для выхода
-    path('logout/', auth_views.LogoutView.as_view(template_name='users/logout.html'), name='logout'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 ]

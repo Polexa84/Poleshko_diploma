@@ -95,6 +95,10 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+LOGOUT_REDIRECT_URL = 'home'
+
+LOGIN_REDIRECT_URL = 'home'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'

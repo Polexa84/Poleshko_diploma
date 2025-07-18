@@ -2,7 +2,7 @@
     <div class="container">
         {# --- ЛЕВАЯ ЧАСТЬ: НАИМЕНОВАНИЕ РЕСТОРАНА --- #}
         <a class="navbar-brand" href="{% url 'home' %}">
-            <ins>и</ins> <i class="fas fa-fish"></i> РЫБА <ins>и</ins> <i class="fas fa-drumstick-bite"></i> МЯСО
+            <h4><ins>и</ins> <i class="fas fa-fish"></i> РЫБА <ins>и</ins> <i class="fas fa-drumstick-bite"></i> МЯСО</h4>
         </a>
 
         {# --- КНОПКА ДЛЯ МОБИЛЬНОЙ ВЕРСИИ --- #}
@@ -31,7 +31,10 @@
                 {# --- ССЫЛКИ НА ВХОД/ВЫХОД --- #}
                 {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="btn btn-danger" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+                        <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                            <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Выйти</button>
+                        </form>
                     </li>
                 {% else %}
                     <li class="nav-item">
