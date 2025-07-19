@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ restaurant.name }}{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>{{ restaurant.name }}</h1>
+        <div class="row">
+            {% for image in restaurant.images.all %}
+                <div class="col-md-4">
+                    <img src="{{ image.image.url }}" alt="{{ restaurant.name }}" class="img-fluid" style="width: 600px; height: 400px; object-fit: cover;">
+                </div>
+            {% endfor %}
+        </div>
+        <p>{{ restaurant.description }}</p>
+        <p>Местоположение: {{ restaurant.location }}</p>
+        <p>Время открытия: {{ restaurant.opening_time|time:"H:i" }}</p>
+        <p>Время закрытия: {{ restaurant.closing_time|time:"H:i" }}</p>
+        <p>Тип кухни: {{ restaurant.cuisine_type }}</p>
+        <p>Средний чек: {{ restaurant.average_check }}</p>
+        <p>Телефон: {{ restaurant.phone }}</p>
+        <p>Email: {{ restaurant.email }}</p>
+    </div>
+{% endblock %}

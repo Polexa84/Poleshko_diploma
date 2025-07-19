@@ -10,4 +10,10 @@ urlpatterns = [
     path('delete_slide/<int:slide_id>/', views.delete_slide, name='delete_slide'),
     path('confirm_delete_slide/<int:slide_id>/', views.confirm_delete_slide, name='confirm_delete_slide'),
     path('edit_slide/<int:slide_id>/', views.edit_slide, name='edit_slide'),
+
+    path('add_restaurant/', views.add_restaurant, name='add_restaurant'),
+    path('edit_restaurant/<int:restaurant_id>/', views.edit_restaurant, name='edit_restaurant'),
+    path('delete_restaurant/<int:restaurant_id>/', views.delete_restaurant, name='delete_restaurant'),
+    path('confirm_delete_restaurant/<int:restaurant_id>/', views.confirm_delete_restaurant,
+         name='confirm_delete_restaurant'),
 ]

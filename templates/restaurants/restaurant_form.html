@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if restaurant %}Редактировать ресторан{% else %}Добавить ресторан{% endif %}{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>{% if restaurant %}Редактировать ресторан{% else %}Добавить ресторан{% endif %}</h1>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="{{ restaurant_form.name.id_for_label }}" class="form-label">Название</label>
+                {{ restaurant_form.name }}
+            </div>
+            <div class="mb-3">
+                <label for="{{ restaurant_form.description.id_for_label }}" class="form-label">Описание</label>
+                {{ restaurant_form.description }}
+            </div>
+            <div class="mb-3">
+                <label for="{{ restaurant_form.location.id_for_label }}" class="form-label">Местоположение</label>
+                {{ restaurant_form.location }}
+                <small class="form-text text-muted">Пример: г. Москва ул. Сретинка д. 5</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.opening_time.id_for_label }}" class="form-label">Время открытия (ЧЧ:ММ)</label>
+                {{ restaurant_form.opening_time }}
+                <small class="form-text text-muted">Пример: 10:00</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.closing_time.id_for_label }}" class="form-label">Время закрытия (ЧЧ:ММ)</label>
+                {{ restaurant_form.closing_time }}
+                <small class="form-text text-muted">Пример: 23:00</small>
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.cuisine_type.id_for_label }}" class="form-label">Тип кухни</label>
+                {{ restaurant_form.cuisine_type }}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.average_check.id_for_label }}" class="form-label">Средний чек</label>
+                {{ restaurant_form.average_check }}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.phone.id_for_label }}" class="form-label">Телефон</label>
+                {{ restaurant_form.phone }}
+            </div>
+
+            <div class="mb-3">
+                <label for="{{ restaurant_form.email.id_for_label }}" class="form-label">Email</label>
+                {{ restaurant_form.email }}
+            </div>
+            {{ image_formset.management_form }}
+            {% for form in image_formset %}
+                {{ form.as_p }}
+                {% if form.instance.image %}
+                    <img src="{{ restaurant.images.first.image.url }}" alt="Текущее изображение" width="100">
+                {% endif %}
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <a href="{% url 'restaurant_list' %}" class="btn btn-secondary">Отмена</a>
+        </form>
+    </div>
+{% endblock %}
