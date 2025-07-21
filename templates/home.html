@@ -20,7 +20,7 @@
             <div class="carousel-inner">
                 {% for slide in slides %}
                     <div class="carousel-item {% if forloop.first %}active{% endif %}">
-                        <img src="{{ slide.image.url }}" class="d-block w-100 img-fluid" style="max-height: 700px; object-fit: cover;" alt="{{ slide.title }}">
+                        <img src="{{ slide.image.url }}" class="d-block w-100 img-fluid" style="max-height: 600px; object-fit: cover;" alt="{{ slide.title }}">
                         <div class="carousel-caption d-none d-md-block bg-success text-white p-1 w-25 mx-auto">
                             <h5 class="fs-5">{{ slide.title }}</h5>
                             {% if request.user.is_superuser or is_admin %}

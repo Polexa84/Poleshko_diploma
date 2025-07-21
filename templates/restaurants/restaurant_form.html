@@ -56,8 +56,12 @@
             {{ image_formset.management_form }}
             {% for form in image_formset %}
                 {{ form.as_p }}
-                {% if form.instance.image %}
-                    <img src="{{ restaurant.images.first.image.url }}" alt="Текущее изображение" width="100">
+                {% if form.instance.pk %}  {# Проверяем, существует ли экземпляр (т.е. уже сохранен) #}
+                    {% for image in restaurant.images.all %}
+                        {% if image.pk == form.instance.pk %}
+                            <img src="{{ image.image.url }}" alt="Текущее изображение" width="100">
+                        {% endif %}
+                    {% endfor %}
                 {% endif %}
             {% endfor %}
             <button type="submit" class="btn btn-primary">Сохранить</button>

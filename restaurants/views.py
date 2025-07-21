@@ -115,4 +115,13 @@ def restaurant_list(request):
 def restaurant_detail(request, pk):
     """Отображает детали ресторана."""
     restaurant = get_object_or_404(Restaurant, pk=pk)
-    return render(request, 'restaurants/restaurant_detail.html', {'restaurant': restaurant})
+
+    # Проверяем, является ли текущий пользователь администратором
+    user_is_admin = is_admin_or_superuser(request.user)
+
+    context = {
+        'restaurant': restaurant,
+        'is_admin': user_is_admin, # Передаем флаг в контекст
+        # ... другие контекстные переменные, если есть ...
+    }
+    return render(request, 'restaurants/restaurant_detail.html', context)

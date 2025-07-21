@@ -6,20 +6,43 @@
 {% block content %}
     <div class="container">
         <h1>{{ restaurant.name }}</h1>
-        <div class="row">
-            {% for image in restaurant.images.all %}
-                <div class="col-md-4">
-                    <img src="{{ image.image.url }}" alt="{{ restaurant.name }}" class="img-fluid" style="width: 600px; height: 400px; object-fit: cover;">
-                </div>
-            {% endfor %}
+
+        {# --- Отображение изображений --- #}
+        <div class="row mb-4"> {# Добавим mb-4 для отступа #}
+            {% if restaurant.images.all %} {# Проверяем, есть ли изображения #}
+                {% for image in restaurant.images.all %}
+                    <div class="col-md-4 mb-2"> {# Добавим mb-2 для отступа между картинками #}
+                        <img src="{{ image.image.url }}" alt="{{ restaurant.name }}" class="img-fluid" style="width: 600px; height: 400px; object-fit: cover;">
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>Фотографий ресторана пока нет.</p>
+            {% endif %}
         </div>
-        <p>{{ restaurant.description }}</p>
-        <p>Местоположение: {{ restaurant.location }}</p>
-        <p>Время открытия: {{ restaurant.opening_time|time:"H:i" }}</p>
-        <p>Время закрытия: {{ restaurant.closing_time|time:"H:i" }}</p>
-        <p>Тип кухни: {{ restaurant.cuisine_type }}</p>
-        <p>Средний чек: {{ restaurant.average_check }}</p>
-        <p>Телефон: {{ restaurant.phone }}</p>
-        <p>Email: {{ restaurant.email }}</p>
+
+        {# --- Информация о ресторане --- #}
+        <p>{{ restaurant.description|linebreaksbr }}</p> {# Используем linebreaksbr для корректного отображения переносов строк #}
+        <p><strong>Местоположение:</strong> {{ restaurant.location }}</p>
+        <p><strong>Время открытия:</strong> {{ restaurant.opening_time|time:"H:i" }}</p>
+        <p><strong>Время закрытия:</strong> {{ restaurant.closing_time|time:"H:i" }}</p>
+        <p><strong>Тип кухни:</strong> {{ restaurant.cuisine_type }}</p>
+        <p><strong>Средний чек:</strong> {{ restaurant.average_check }}</p>
+        <p><strong>Телефон:</strong> {{ restaurant.phone }}</p>
+        <p><strong>Email:</strong> {{ restaurant.email }}</p>
+
+        {# --- ССЫЛКА НА БРОНИРОВАНИЕ (если пользователь авторизован) --- #}
+        {% if request.user.is_authenticated %}
+            <a href="{% url 'restaurant_booking' restaurant.id %}" class="btn btn-success mb-3">Забронировать столик</a>
+        {% else %}
+            <p>Для бронирования столика, пожалуйста, <a href="{% url 'login' %}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
+        {% endif %}
+
+        {# --- КНОПКА ДОБАВИТЬ СТОЛИК (ТОЛЬКО ДЛЯ АДМИНОВ) --- #}
+        {% if is_admin %}
+            <div class="mt-4"> {# Добавляем отступ сверху #}
+                <a href="{% url 'add_table_to_restaurant' restaurant.id %}" class="btn btn-info"><i class="fas fa-plus"></i> Добавить столик</a>
+                {# ПРИМЕЧАНИЕ: URL 'add_table_to_restaurant' еще не существует. Вам нужно будет его создать. #}
+            </div>
+        {% endif %}
     </div>
 {% endblock %}
