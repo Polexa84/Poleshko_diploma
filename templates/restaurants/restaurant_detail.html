@@ -8,8 +8,8 @@
         <h1>{{ restaurant.name }}</h1>
 
         {# --- Отображение изображений --- #}
-        <div class="row mb-4"> {# Добавим mb-4 для отступа #}
-            {% if restaurant.images.all %} {# Проверяем, есть ли изображения #}
+        <div class="row mb-4">
+            {% if restaurant.images.all %}
                 {% for image in restaurant.images.all %}
                     <div class="col-md-4 mb-2"> {# Добавим mb-2 для отступа между картинками #}
                         <img src="{{ image.image.url }}" alt="{{ restaurant.name }}" class="img-fluid" style="width: 600px; height: 400px; object-fit: cover;">
@@ -21,7 +21,7 @@
         </div>
 
         {# --- Информация о ресторане --- #}
-        <p>{{ restaurant.description|linebreaksbr }}</p> {# Используем linebreaksbr для корректного отображения переносов строк #}
+        <p>{{ restaurant.description|linebreaksbr }}</p>
         <p><strong>Местоположение:</strong> {{ restaurant.location }}</p>
         <p><strong>Время открытия:</strong> {{ restaurant.opening_time|time:"H:i" }}</p>
         <p><strong>Время закрытия:</strong> {{ restaurant.closing_time|time:"H:i" }}</p>
@@ -37,11 +37,37 @@
             <p>Для бронирования столика, пожалуйста, <a href="{% url 'login' %}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
         {% endif %}
 
+        {# --- Отображение списка столов --- #}
+        <h2>Столики:</h2>
+        {% if restaurant.tables.all %}
+            <div class="row">
+                {% for table in restaurant.tables.all %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            {% if table.image %}
+                                <img src="{{ table.image.url }}" class="card-img-top" alt="Фото стола" style="height: 200px; object-fit: cover;">
+                            {% endif %}
+                            <div class="card-body">
+                                <h5 class="card-title">Стол №{{ table.number }}</h5>
+                                <p class="card-text">Вместимость: {{ table.capacity }}</p>
+                                {# --- Кнопки "Редактировать" и "Удалить" (только для админов) --- #}
+                                {% if is_admin %}
+                                    <a href="{% url 'edit_table' table.id %}" class="btn btn-warning"><i class="fas fa-edit"></i> Редактировать</a>  <!-- Corrected Edit Button -->
+                                    <a href="{% url 'delete_table' table.id %}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Удалить</a> <!-- Corrected Delete Button -->
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>В этом ресторане пока нет столов.</p>
+        {% endif %}
+
         {# --- КНОПКА ДОБАВИТЬ СТОЛИК (ТОЛЬКО ДЛЯ АДМИНОВ) --- #}
         {% if is_admin %}
-            <div class="mt-4"> {# Добавляем отступ сверху #}
+            <div class="mt-4">
                 <a href="{% url 'add_table_to_restaurant' restaurant.id %}" class="btn btn-info"><i class="fas fa-plus"></i> Добавить столик</a>
-                {# ПРИМЕЧАНИЕ: URL 'add_table_to_restaurant' еще не существует. Вам нужно будет его создать. #}
             </div>
         {% endif %}
     </div>

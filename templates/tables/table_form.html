@@ -1,16 +1,20 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Добавить столик в {{ restaurant.name }}{% endblock %}
+{% block title %}{% if table %}Редактировать столик{% else %}Добавить столик{% endif %}{% endblock %}
 
 {% block content %}
     <div class="container">
-        <h1>Добавить столик в {{ restaurant.name }}</h1>
-        <form method="post">
+        <h1>{% if table %}Редактировать столик{% else %}Добавить столик{% endif %}</h1>
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             {{ form.as_p }}
             <button type="submit" class="btn btn-primary">Сохранить</button>
-            <a href="{% url 'restaurant_detail' restaurant.id %}" class="btn btn-secondary">Отмена</a>
+            {% if table %}
+                <a href="{% url 'restaurant_detail' table.restaurant.id %}" class="btn btn-secondary">Отмена</a>
+            {% else %}
+                <a href="{% url 'restaurant_detail' restaurant.id %}" class="btn btn-secondary">Отмена</a>
+            {% endif %}
         </form>
     </div>
 {% endblock %}
