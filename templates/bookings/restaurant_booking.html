@@ -4,66 +4,46 @@
 {% block content %}
     <div class="container">
         <h1>Бронирование столика в {{ restaurant.name }}</h1>
-        <p>Выберите стол и время:</p>
 
-        <form method="post">
-            {% csrf_token %}
-
-            {% if form.errors %}
-                <div class="alert alert-danger" role="alert">
-                    Пожалуйста, исправьте следующие ошибки:
-                    <ul>
-                        {% for field, errors in form.errors.items %}
-                            {% for error in errors %}
-                                <li>{{ form.field.label }}: {{ error }}</li>  <!-- Corrected Line -->
-                                 <ul>
-                                     {% for e in errors %}
-                                        <li>{{ e }}</li>
-                                     {% endfor %}
-                                 </ul>
-                            {% endfor %}
-                        {% endfor %}
-                    </ul>
-                </div>
+        {% if selected_table %}
+            <p>Вы бронируете столик №{{ selected_table.number }} (Вместимость: {{ selected_table.capacity }})</p>
+            {% if selected_table.image %}
+                <img src="" alt="Фото стола №{{ selected_table.number }}" width="200">
             {% endif %}
+        {% else %}
+            <p>Пожалуйста, выберите столик для бронирования.</p>
+        {% endif %}
 
-            <div class="mb-3">
-                <label for="{{ form.table.id_for_label }}" class="form-label">Стол</label>
-                {{ form.table }}
-                {% if form.table.errors %}
-                    <div class="text-danger">
-                        {% for error in form.table.errors %}
-                                {{ error }}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="{{ form.booking_time.id_for_label }}" class="form-label">Дата и время бронирования</label>
-                {{ form.booking_time }}
-                {% if form.booking_time.errors %}
-                    <div class="text-danger">
-                        {% for error in form.booking_time.errors %}
-                             {{ error }}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="{{ form.duration.id_for_label }}" class="form-label">Длительность</label>
-                {{ form.duration }}
-                {% if form.duration.errors %}
-                    <div class="text-danger">
-                        {% for error in form.duration.errors %}
-                             {{ error }}
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-
-            <button type="submit" class="btn btn-primary">Забронировать</button>
+        {# Date selection form #}
+        <form method="get">
+            <label for="date">Выберите дату:</label>
+            <input type="date" id="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+            <input type="hidden" name="table" value="{{ selected_table.id }}">
+            <button type="submit">Показать доступное время</button>
         </form>
+
+        {% if has_available_times %}
+            {# Time selection form #}
+            <form method="post">
+                {% csrf_token %}
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        Пожалуйста, исправьте следующие ошибки:
+                    </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <h5>Выберите время бронирования:</h5>
+                    {% for time_slot in available_times %}
+                        <button type="submit" name="booking_time" value="{{ time_slot.start_time }}" class="btn btn-outline-primary">{{ time_slot.display_time }}</button>
+                    {% endfor %}
+                </div>
+
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Забронировать</button>
+            </form>
+        {% else %}
+            <p>Нет доступного времени для бронирования столика на выбранную дату.</p>
+        {% endif %}
     </div>
 {% endblock %}

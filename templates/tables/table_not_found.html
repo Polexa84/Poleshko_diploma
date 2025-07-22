@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container">
+        <h1>Столик не найден</h1>
+        <p>Столик, который вы выбрали, не существует в этом ресторане.</p>
+        <a href="{% url 'restaurant_detail' restaurant.id %}" class="btn btn-primary">Вернуться к ресторану</a>
+    </div>
+{% endblock %}

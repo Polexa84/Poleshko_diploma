@@ -30,13 +30,6 @@
         <p><strong>Телефон:</strong> {{ restaurant.phone }}</p>
         <p><strong>Email:</strong> {{ restaurant.email }}</p>
 
-        {# --- ССЫЛКА НА БРОНИРОВАНИЕ (если пользователь авторизован) --- #}
-        {% if request.user.is_authenticated %}
-            <a href="{% url 'restaurant_booking' restaurant.id %}" class="btn btn-success mb-3">Забронировать столик</a>
-        {% else %}
-            <p>Для бронирования столика, пожалуйста, <a href="{% url 'login' %}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
-        {% endif %}
-
         {# --- Отображение списка столов --- #}
         <h2>Столики:</h2>
         {% if restaurant.tables.all %}
@@ -50,10 +43,18 @@
                             <div class="card-body">
                                 <h5 class="card-title">Стол №{{ table.number }}</h5>
                                 <p class="card-text">Вместимость: {{ table.capacity }}</p>
+
+                                {# --- Кнопка "Забронировать" (если пользователь авторизован) --- #}
+                                {% if request.user.is_authenticated %}
+                                    <a href="{% url 'restaurant_booking' restaurant.id %}?table={{ table.id }}" class="btn btn-success">Забронировать</a>
+                                {% else %}
+                                    <p>Для бронирования столика, пожалуйста, <a href="{% url 'login' %}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
+                                {% endif %}
+
                                 {# --- Кнопки "Редактировать" и "Удалить" (только для админов) --- #}
                                 {% if is_admin %}
-                                    <a href="{% url 'edit_table' table.id %}" class="btn btn-warning"><i class="fas fa-edit"></i> Редактировать</a>  <!-- Corrected Edit Button -->
-                                    <a href="{% url 'delete_table' table.id %}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Удалить</a> <!-- Corrected Delete Button -->
+                                    <a href="{% url 'edit_table' table.id %}" class="btn btn-warning"><i class="fas fa-edit"></i> Редактировать</a>
+                                    <a href="{% url 'delete_table' table.id %}" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Удалить</a>
                                 {% endif %}
                             </div>
                         </div>
