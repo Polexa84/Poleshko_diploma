@@ -1,41 +1,44 @@
 {% extends 'base.html' %}
-{% load widget_tweaks %} {# Убедитесь, что эта строка есть #}
+{% load widget_tweaks %}
 
 {% block content %}
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h2 class="card-title">Вход</h2>
-                        <form method="post">
-                            {% csrf_token %}
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h2 class="card-title">Вход</h2>
 
-                            {# Итерация по полям формы. Форма для входа обычно имеет 'username' и 'password' #}
-                            {% for field in form %}
-                                <div class="mb-3">
-                                    {{ field.label_tag }}
-                                    {% render_field field class="form-control" placeholder=field.label %}
-                                    {% if field.errors %}
-                                        <div class="alert alert-danger mt-1">
-                                            {% for error in field.errors %}
-                                              {{ error }}
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                    {# Помощь для пароля, если есть (обычно нет) #}
-                                    {% if field.help_text %}
-                                        <small class="form-text text-muted">{{ field.help_text }}</small>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
+            {# Добавляем блок для отображения общих сообщений #}
+            {% if messages %}
+              <ul class="messages">
+                {% for message in messages %}
+                  <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
 
-                            <button type="submit" class="btn btn-primary">Войти</button>
-                        </form>
-                        <p class="mt-3">Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
+            <form method="post">
+              {% csrf_token %}
+              {% for field in form %}
+                <div class="mb-3">
+                  {{ field.label_tag }}
+                  {% render_field field class="form-control" placeholder=field.label %}
+                  {% if field.errors %}
+                    <div class="alert alert-danger mt-1">
+                      {% for error in field.errors %}
+                        {{ error }}
+                      {% endfor %}
                     </div>
+                  {% endif %}
                 </div>
-            </div>
+              {% endfor %}
+              <button type="submit" class="btn btn-primary">Войти</button>
+            </form>
+            <p class="mt-3">Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 {% endblock %}

@@ -90,6 +90,8 @@ USE_I18N = True
 
 USE_TZ = True
 
+LOGIN_URL = '/users/login/'
+
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
@@ -118,3 +120,7 @@ EMAIL_USE_TLS = True # Использовать TLS
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER # Email, с которого будут отправляться сообщения по умолчанию
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]

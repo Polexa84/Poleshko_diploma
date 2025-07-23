@@ -2,8 +2,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from restaurants.models import Restaurant
-from .models import Table, Booking
-from .forms import BookingForm  # Add this line
+from tables.models import Table  #  Импортируем модель Table
+from .models import Booking
+from .forms import BookingForm
 from datetime import datetime, timedelta
 from django.core.mail import send_mail
 from django.conf import settings
@@ -149,3 +150,11 @@ def my_bookings(request):
     """Отображает список бронирований текущего пользователя."""
     bookings = Booking.objects.filter(user=request.user).order_by('-booking_time')
     return render(request, 'bookings/my_bookings.html', {'bookings': bookings})
+
+@login_required
+def delete_booking(request, booking_id):
+    booking = get_object_or_404(Booking, id=booking_id, user=request.user) #  Получаем бронирование или возвращаем 404
+    if request.method == 'POST':
+        booking.delete()
+        return redirect('my_bookings') #  Перенаправляем на список бронирований
+    return render(request, 'bookings/confirm_delete.html', {'booking': booking}) #  Подтверждаем удаление

@@ -1,32 +1,47 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import get_user_model # Лучше использовать get_user_model
-from .models import UserProfile
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from django.conf import settings
+from django.urls import reverse
+import uuid
+from django.core.validators import EmailValidator
+from .models import UserProfile  # Добавлено
 
-# Получаем модель пользователя, которая используется в проекте (по умолчанию User)
 User = get_user_model()
 
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(
         label="Email",
         required=True,
-        widget=forms.EmailInput(attrs={'class': 'form-control'})
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+        validators=[EmailValidator(message="Введите корректный email адрес")]
     )
-    # Можно добавить поле для роли, если хотим, чтобы пользователь сам выбирал роль при регистрации,
-    # но чаще роль назначает админ или она определяется иначе.
-    # Для начала, предположим, что все новые пользователи будут "Клиентами".
 
     class Meta(UserCreationForm.Meta):
-        model = User # Указываем, что работаем со стандартной моделью User
-        fields = UserCreationForm.Meta.fields + ("email",) # Добавляем email к полям формы
+        model = User
+        fields = UserCreationForm.Meta.fields + ("email",)
 
-    def save(self, commit=True):
-        # Переопределяем метод save, чтобы создать пользователя и его профиль
-        user = super().save(commit=False) # Создаем пользователя, но не сохраняем его пока
-        user.email = self.cleaned_data['email'] # Устанавливаем email
+    def save(self, commit=True, request=None):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        user.is_active = False
 
         if commit:
             user.save()
-            # Создаем профиль пользователя, назначая роль "Клиент" по умолчанию
-            UserProfile.objects.create(user=user, role=UserProfile.USER_ROLE_CUSTOMER)
+            profile = UserProfile.objects.get(user=user) # Получаем профиль, созданный сигналом
+            confirmation_token = uuid.uuid4()
+            profile.confirmation_token = confirmation_token
+            profile.save()
+
+            # Отправляем письмо с подтверждением
+            subject = 'Подтверждение регистрации'
+            # используем request для формирования абсолютного URL
+            confirmation_url = request.build_absolute_uri(reverse('confirm_email', args=[str(confirmation_token)]))
+            message = f'Здравствуйте, {user.username}!\n\nПожалуйста, подтвердите свой email, перейдя по ссылке: {confirmation_url}\n\nС уважением, Администрация'
+            from_email = settings.DEFAULT_FROM_EMAIL
+            recipient_list = [user.email]
+            send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+            print("Confirmation email sent successfully!")
+
         return user

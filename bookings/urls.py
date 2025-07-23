@@ -7,4 +7,5 @@ urlpatterns = [
     path('my_bookings/', views.my_bookings, name='my_bookings'),
     path('restaurant/<int:restaurant_id>/table/<int:table_id>/confirm/<str:booking_time>/', views.booking_confirmation,
          name='booking_confirmation'),  # New URL
+    path('delete_booking/<int:booking_id>/', views.delete_booking, name='delete_booking'),  # Добавляем URL для удаления
 ]
