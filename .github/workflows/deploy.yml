@@ -120,21 +120,12 @@ jobs:
           # Use an absolute path for the venv directory
           VENV_DIR="/home/deployer/Poleshko_diploma/venv"
   
-          # Activate virtual environment
-          if [ ! -f "$VENV_DIR/bin/activate" ]; then
-            echo "Error: venv/bin/activate not found!"
-            exit 1
-          fi
-  
-          echo "Activating virtual environment..."
-          source "$VENV_DIR/bin/activate"
-  
-          echo "Checking Python version in venv..."
-          python --version
+          # Use full path to pip
+          PIP_PATH="$VENV_DIR/bin/pip"
   
           echo "Installing project dependencies..."
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          "$PIP_PATH" install --upgrade pip
+          "$PIP_PATH" install -r requirements.txt
   
           echo "Applying database migrations..."
           python manage.py migrate
