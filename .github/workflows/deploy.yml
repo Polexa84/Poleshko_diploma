@@ -118,27 +118,17 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-        echo "Creating production environment file..."
-        cat > .env.prod <<EOL
-          DEBUG=False
-          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-          POSTGRES_DB_NAME=testdb
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=password
-          POSTGRES_HOST=localhost
-          POSTGRES_PORT=5432
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
-          EMAIL_HOST_USER=Elfinator84@yandex.ru
-          EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
-          EOL
+        echo "Setting environment variables..."
+        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+        export POSTGRES_USER="postgres"
+        export POSTGRES_PASSWORD="password"
+        export POSTGRES_DB="testdb"
 
         echo "Applying migrations..."
-        python manage.py migrate --noinput
+        python manage.py migrate
 
         echo "Collecting static files..."
         python manage.py collectstatic --noinput
-
         echo "Deployment tasks completed successfully."
         DEPLOY
 
