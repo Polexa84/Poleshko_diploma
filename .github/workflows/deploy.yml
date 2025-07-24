@@ -47,7 +47,7 @@ jobs:
           sleep 5
         done
         echo "PostgreSQL is ready!"
-        psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
+        psql -h localhost -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
         python manage.py migrate
       env:
         POSTGRES_USER: postgres
