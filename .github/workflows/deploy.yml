@@ -5,6 +5,15 @@ on:
     branches:
       - develop_1
 
+env:
+  DJANGO_SETTINGS_MODULE: booking_system.settings
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+  POSTGRES_DB_NAME: testdb
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: password
+  REDIS_URL: redis://localhost:6379/0
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,14 +32,10 @@ jobs:
           --health-timeout 5s
           --health-retries 3
 
-    env:
-      DJANGO_SETTINGS_MODULE: booking_system.settings
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
-      POSTGRES_DB_NAME: testdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
 
     steps:
     - uses: actions/checkout@v4
@@ -40,30 +45,49 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev python3-dev
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-    - name: Wait for PostgreSQL
+    - name: Verify PostgreSQL connection
       run: |
         echo "Waiting for PostgreSQL..."
         for i in {1..10}; do
-          if pg_isready -h localhost -p 5432; then
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
             echo "PostgreSQL is ready!"
             exit 0
           fi
-          echo "Waiting..."
-          sleep 2
+          echo "Attempt $i/10 - Waiting for PostgreSQL..."
+          sleep 3
         done
-        echo "PostgreSQL not ready!"
+        echo "Failed to connect to PostgreSQL"
         exit 1
 
     - name: Run migrations
       run: python manage.py migrate --noinput
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
     - name: Run tests
       run: python manage.py test --noinput
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
   deploy:
     needs: test
@@ -72,7 +96,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up SSH
+    - name: Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -83,31 +107,31 @@ jobs:
         ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
-    - name: Rsync project files
+    - name: Sync project files
       run: |
         rsync -avz --delete \
           --exclude '__pycache__' \
           --exclude '.env*' \
           --exclude '.git' \
           --exclude 'venv' \
-          . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+          ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}/
 
-    - name: Deploy on server
+    - name: Execute deployment
       run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
         set -e
         cd ${{ secrets.DEPLOY_DIR }}
-
+        
         # Setup virtual environment
         if [ ! -d "venv" ]; then
           python3 -m venv venv
         fi
-
+        
         source venv/bin/activate
         pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-        # Create production .env file
+        # Create production environment
         cat > .env.prod <<EOL
 DEBUG=False
 SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
@@ -116,15 +140,17 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
+REDIS_HOST=localhost
+REDIS_PORT=6379
 EMAIL_HOST_USER=Elfinator84@yandex.ru
 EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
 EOL
 
-        # Django commands
+        # Execute Django commands
         python manage.py migrate --noinput
         python manage.py collectstatic --noinput
 
         # Restart services
         sudo systemctl restart gunicorn
         sudo systemctl reload nginx
-        EOF
+DEPLOY
