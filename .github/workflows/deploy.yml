@@ -41,8 +41,12 @@ jobs:
     - name: Prepare database
       run: |
         echo "Waiting for PostgreSQL to start..."
-        sleep 10 # Даем PostgreSQL 10 секунд на запуск
         export PGPASSWORD=$POSTGRES_PASSWORD
+        while ! pg_isready -h localhost -p 5432 -U $POSTGRES_USER -d postgres; do
+          echo "PostgreSQL is not ready yet, waiting..."
+          sleep 5
+        done
+        echo "PostgreSQL is ready!"
         psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
         python manage.py migrate
       env:
