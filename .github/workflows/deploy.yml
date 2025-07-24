@@ -110,15 +110,6 @@ jobs:
         rsync -avz --delete --exclude '__pycache__' --exclude 'db.sqlite3' --exclude 'static' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
-    - name: Check virtual environment
-      run: |
-        echo "Checking virtual environment..."
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e
-          set -x
-          /home/deployer/Poleshko_diploma/check_venv.sh
-        EOF
-
     - name: Install dependencies, apply migrations, collect static files
       run: |
         echo "Installing dependencies, applying migrations, and collecting static files..."
@@ -128,6 +119,12 @@ jobs:
   
           # Use an absolute path for the venv directory
           VENV_DIR="/home/deployer/Poleshko_diploma/venv"
+  
+          # Activate virtual environment
+          if [ ! -f "$VENV_DIR/bin/activate" ]; then
+            echo "Error: venv/bin/activate not found!"
+            exit 1
+          fi
   
           echo "Activating virtual environment..."
           source "$VENV_DIR/bin/activate"
