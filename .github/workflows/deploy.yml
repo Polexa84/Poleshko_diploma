@@ -40,8 +40,13 @@ jobs:
 
     - name: Prepare database
       run: |
-        python manage.py dbshell -c "CREATE DATABASE testdb;"
+        export PGPASSWORD=$POSTGRES_PASSWORD
+        psql -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
         python manage.py migrate
+      env:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+        POSTGRES_DB: testdb
 
     - name: Run tests
       run: python manage.py test --noinput
