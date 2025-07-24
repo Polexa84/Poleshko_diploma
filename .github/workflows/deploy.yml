@@ -17,9 +17,12 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
+          POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
     env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
       POSTGRES_DB_NAME: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -46,14 +49,37 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Wait for PostgreSQL
+      run: |
+        for i in {1..15}; do
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
+            echo "PostgreSQL ready!"
+            exit 0
+          fi
+          echo "Waiting for PostgreSQL... ($i/15)"
+          sleep 2
+        done
+        echo "PostgreSQL not ready!"
+        exit 1
+
     - name: Set up database
       working-directory: .
       run: python manage.py migrate
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_DB: testdb
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
 
     - name: Run tests
       working-directory: .
       run: python manage.py test --settings=habit_tracker.settings_test
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_DB: testdb
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
