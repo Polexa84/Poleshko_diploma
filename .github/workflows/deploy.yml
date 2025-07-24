@@ -27,68 +27,44 @@ jobs:
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_DB: testdb
+      POSTGRES_DB_NAME: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-      DJANGO_SETTINGS_MODULE: booking_system.settings
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Debug environment variables
-      run: |
-        echo "POSTGRES_DB: $POSTGRES_DB"
-        echo "POSTGRES_USER: $POSTGRES_USER"
-        echo "POSTGRES_PASSWORD: $POSTGRES_PASSWORD"
-        echo "DJANGO_SECRET_KEY: $DJANGO_SECRET_KEY"
-        echo "DJANGO_SETTINGS_MODULE: $DJANGO_SETTINGS_MODULE"
 
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y libpq-dev python3-dev
-
-    - name: Cache pip
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
-    - name: Install dependencies
-      run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-    - name: Verify PostgreSQL connection
+    - name: Wait for PostgreSQL
       run: |
-        echo "Waiting for PostgreSQL..."
-        for i in {1..20}; do
+        for i in {1..15}; do
           if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
-            echo "PostgreSQL is ready!"
+            echo "PostgreSQL ready!"
             exit 0
           fi
-          echo "Attempt $i/20 - Waiting for PostgreSQL..."
-          sleep 3
+          echo "Waiting for PostgreSQL... ($i/15)"
+          sleep 2
         done
-        echo "Failed to connect to PostgreSQL after 20 attempts"
+        echo "PostgreSQL not ready!"
         exit 1
-
-    - name: Create static directory
-      run: mkdir -p static
 
     - name: Run migrations
       run: python manage.py migrate --noinput
 
     - name: Run tests
-      run: python manage.py test --settings=booking_system.settings
+      run: python manage.py test --noinput
 
   deploy:
     needs: test
@@ -121,29 +97,39 @@ jobs:
           . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
-    - name: Deploy application
+    - name: Install dependencies and deploy
       run: |
         echo "Executing deployment commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
         set -e
         set -x
+        echo "Changing to project directory..."
         cd ${{ secrets.DEPLOY_DIR }}
 
-        # Create and activate virtual environment
+        echo "Setting up virtual environment..."
         if [ ! -d "venv" ]; then
           python3 -m venv venv
         fi
+
+        echo "Activating virtual environment..."
         source venv/bin/activate
 
-        # Install dependencies
+        echo "Installing dependencies..."
         pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements.txt psycopg2-binary
 
-        # Apply migrations and collect static files
-        python manage.py migrate --noinput
+        echo "Setting environment variables..."
+        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+        export POSTGRES_USER="postgres"
+        export POSTGRES_PASSWORD="password"
+        export POSTGRES_DB="testdb"
+
+        echo "Applying migrations..."
+        python manage.py migrate
+
+        echo "Collecting static files..."
         python manage.py collectstatic --noinput
-
-        echo "Deployment completed successfully."
+        echo "Deployment tasks completed successfully."
         DEPLOY
 
     - name: Restart services
