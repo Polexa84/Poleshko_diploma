@@ -159,9 +159,15 @@ jobs:
           echo "Activating virtual environment..."
           source "$VENV_DIR/bin/activate"
   
+          echo "Checking Python version in venv..."
+          python --version
+  
           echo "Installing project dependencies..."
           pip install --upgrade pip
           pip install -r requirements.txt
+  
+          echo "Listing installed packages..."
+          pip list
   
           echo "Applying database migrations..."
           python manage.py migrate
@@ -170,4 +176,15 @@ jobs:
           python manage.py collectstatic --noinput
   
           echo "Deployment commands executed successfully."
+        EOF
+
+    - name: Restart services
+      run: |
+        echo "Restarting application services..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+          sudo systemctl restart gunicorn
+          sudo systemctl reload nginx
+          echo "Services restarted successfully."
         EOF
