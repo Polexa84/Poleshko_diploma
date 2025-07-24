@@ -9,7 +9,7 @@ env:
   DJANGO_SETTINGS_MODULE: booking_system.settings
   POSTGRES_DB_NAME: booking_system
   POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: новый_пароль
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
   REDIS_URL: redis://redis:6379/0
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
         image: postgres:15-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: новый_пароль
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: booking_system
         ports:
           - "5432:5432"
@@ -88,14 +88,14 @@ jobs:
       run: |
         rsync -avz --delete \
           --exclude '__pycache__' \
-          --exclude '.env' \
+          --exclude '.env*' \
           --exclude '.git' \
           --exclude 'venv' \
           . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
 
     - name: Deploy on server
       run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
         set -e
         cd ${{ secrets.DEPLOY_DIR }}
 
@@ -105,27 +105,29 @@ jobs:
         fi
 
         source venv/bin/activate
+        pip install --upgrade pip
         pip install -r requirements.txt
 
         # Create production .env if not exists
         if [ ! -f ".env.prod" ]; then
           cat > .env.prod <<EOL
-          DEBUG=False
-          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-          POSTGRES_DB_NAME=booking_system
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=новый_пароль
-          POSTGRES_HOST=localhost
-          POSTGRES_PORT=5432
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
-          EMAIL_HOST_USER=Elfinator84@yandex.ru
-          EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
-          EOL
+        DEBUG=False
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_DB_NAME=booking_system
+        POSTGRES_USER=postgres
+        POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+        POSTGRES_HOST=localhost
+        POSTGRES_PORT=5432
+        REDIS_HOST=localhost
+        REDIS_PORT=6379
+        EMAIL_HOST_USER=Elfinator84@yandex.ru
+        EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+        EOL
         fi
 
-        python manage.py migrate --settings=booking_system.settings.production
-        python manage.py collectstatic --noinput --settings=booking_system.settings.production
+        export DJANGO_SETTINGS_MODULE=booking_system.settings.production
+        python manage.py migrate
+        python manage.py collectstatic --noinput
 
         sudo systemctl restart gunicorn
         sudo systemctl reload nginx
