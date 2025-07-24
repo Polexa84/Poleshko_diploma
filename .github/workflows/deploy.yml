@@ -117,6 +117,9 @@ jobs:
           set -e
           set -x
   
+          # Print current working directory
+          pwd
+  
           echo "Installing project dependencies..."
           pip install --upgrade pip --break-system-packages
           pip install -r requirements.txt --break-system-packages
