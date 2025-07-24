@@ -110,45 +110,24 @@ jobs:
         rsync -avz --delete --exclude '__pycache__' --exclude 'db.sqlite3' --exclude 'static' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
+    - name: Check virtual environment
+      run: |
+        echo "Checking virtual environment..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+          /home/deployer/Poleshko_diploma/check_venv.sh
+        EOF
+
     - name: Install dependencies, apply migrations, collect static files
       run: |
-        echo "Executing commands on server..."
+        echo "Installing dependencies, applying migrations, and collecting static files..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e  # Выходить при первой ошибке
-          set -x  # Подробный вывод выполняемых команд
-  
-          echo "Checking Python version..."
-          python3 --version
-  
-          echo "Changing directory to deployment folder..."
-          PROJECT_DIR="${{ secrets.DEPLOY_DIR }}" # Используйте переменную DEPLOY_DIR
-          cd "$PROJECT_DIR"
-  
-          echo "Setting environment variables..."
-          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres"
-          export POSTGRES_PASSWORD="password"
-          export POSTGRES_DB="testdb"
-          export POSTGRES_HOST="localhost"
-          export POSTGRES_PORT="5432"
+          set -e
+          set -x
   
           # Use an absolute path for the venv directory
-          VENV_DIR="$PROJECT_DIR/venv"
-  
-          # Add debugging information
-          echo "PROJECT_DIR: $PROJECT_DIR"
-          echo "VENV_DIR: $VENV_DIR"
-  
-          echo "Checking if venv directory exists: ls -l $PROJECT_DIR"
-          ls -l "$PROJECT_DIR"
-          echo "Checking if activate script exists: ls -l $VENV_DIR/bin"
-          ls -l "$VENV_DIR/bin"
-  
-          # Assume venv already exists
-          if [ ! -f "$VENV_DIR/bin/activate" ]; then
-            echo "Error: venv/bin/activate not found!"
-            exit 1
-          fi
+          VENV_DIR="/home/deployer/Poleshko_diploma/venv"
   
           echo "Activating virtual environment..."
           source "$VENV_DIR/bin/activate"
