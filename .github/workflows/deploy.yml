@@ -27,7 +27,7 @@ jobs:
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_DB_NAME: testdb
+      POSTGRES_DB: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -141,7 +141,9 @@ jobs:
         export POSTGRES_PORT="5432"
 
         # Apply migrations and collect static files
+        echo "Applying migrations..."
         python manage.py migrate --noinput
+        echo "Collecting static files..."
         python manage.py collectstatic --noinput
 
         echo "Deployment completed successfully."
