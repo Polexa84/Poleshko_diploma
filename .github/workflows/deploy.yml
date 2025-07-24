@@ -135,6 +135,12 @@ jobs:
             python3 -m venv venv
           fi
 
+          # Add this block to check if venv/bin/activate exists
+          if [ ! -f "venv/bin/activate" ]; then
+            echo "Error: venv/bin/activate not found!"
+            exit 1
+          fi
+
           echo "Activating virtual environment..."
           source venv/bin/activate
 
