@@ -16,15 +16,16 @@ jobs:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
         ports:
-          - "5440:5432"
+          - "5432:5432"
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
+          -e POSTGRES_HOST_AUTH_METHOD=trust  # Добавлено для упрощения подключения
 
     env:
-      POSTGRES_HOST: postgres  # Изменено с localhost на postgres
+      POSTGRES_HOST: localhost  # Оставляем localhost для GitHub Actions
       POSTGRES_PORT: 5432
       POSTGRES_DB_NAME: testdb
       POSTGRES_USER: postgres
@@ -35,7 +36,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
@@ -58,31 +59,29 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-    - name: Wait for PostgreSQL
+    - name: Verify PostgreSQL connection
       run: |
-        echo "Waiting for PostgreSQL to be ready..."
-        for i in {1..10}; do
-          if pg_isready -h postgres -p 5432; then
+        echo "Waiting for PostgreSQL..."
+        for i in {1..15}; do
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
             echo "PostgreSQL is ready!"
             exit 0
           fi
-          echo "Waiting..."
+          echo "Attempt $i/15 - Waiting for PostgreSQL..."
           sleep 2
         done
-        echo "PostgreSQL not ready!"
+        echo "Failed to connect to PostgreSQL after 15 attempts"
         exit 1
 
     - name: Create static directory
       run: mkdir -p static
 
-    - name: Set up database
-      working-directory: .
-      run: python manage.py migrate
+    - name: Run migrations
+      run: python manage.py migrate --noinput
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
 
     - name: Run tests
-      working-directory: .
       run: python manage.py test --settings=booking_system.settings
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
