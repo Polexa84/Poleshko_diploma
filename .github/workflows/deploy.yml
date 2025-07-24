@@ -25,9 +25,7 @@ jobs:
           --health-retries 3
 
     env:
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: testdb
+      POSTGRES_DB_NAME: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
