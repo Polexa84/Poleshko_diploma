@@ -15,6 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
+          POSTGRES_HOST_AUTH_METHOD: trust  # Перенесено внутрь env
         ports:
           - "5432:5432"
         options: >-
@@ -22,10 +23,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-          -e POSTGRES_HOST_AUTH_METHOD=trust  # Добавлено для упрощения подключения
 
     env:
-      POSTGRES_HOST: localhost  # Оставляем localhost для GitHub Actions
+      POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
       POSTGRES_DB_NAME: testdb
       POSTGRES_USER: postgres
@@ -62,15 +62,15 @@ jobs:
     - name: Verify PostgreSQL connection
       run: |
         echo "Waiting for PostgreSQL..."
-        for i in {1..15}; do
+        for i in {1..20}; do
           if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
             echo "PostgreSQL is ready!"
             exit 0
           fi
-          echo "Attempt $i/15 - Waiting for PostgreSQL..."
-          sleep 2
+          echo "Attempt $i/20 - Waiting for PostgreSQL..."
+          sleep 3
         done
-        echo "Failed to connect to PostgreSQL after 15 attempts"
+        echo "Failed to connect to PostgreSQL after 20 attempts"
         exit 1
 
     - name: Create static directory
@@ -78,10 +78,6 @@ jobs:
 
     - name: Run migrations
       run: python manage.py migrate --noinput
-      env:
-        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
 
     - name: Run tests
       run: python manage.py test --settings=booking_system.settings
-      env:
-        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
