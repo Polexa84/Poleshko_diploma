@@ -116,14 +116,14 @@ jobs:
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e  # Выходить при первой ошибке
           set -x  # Подробный вывод выполняемых команд
-
+  
           echo "Checking Python version..."
           python3 --version
-
+  
           echo "Changing directory to deployment folder..."
           PROJECT_DIR="${{ secrets.DEPLOY_DIR }}" # Используйте переменную DEPLOY_DIR
           cd "$PROJECT_DIR"
-
+  
           echo "Setting environment variables..."
           export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
           export POSTGRES_USER="postgres"
@@ -131,36 +131,41 @@ jobs:
           export POSTGRES_DB="testdb"
           export POSTGRES_HOST="localhost"
           export POSTGRES_PORT="5432"
-
+  
           echo "Creating virtual environment..."
           if [ ! -d "venv" ]; then
             echo "Creating virtual environment..."
             python3 -m venv venv
+            # Check the return code of the venv command
+            if [ $? -ne 0 ]; then
+              echo "Error: venv command failed!"
+              exit 1
+            fi
             # Check if the venv directory was actually created
             if [ ! -d "venv" ]; then
               echo "Error: venv directory was not created!"
               exit 1
             fi
           fi
-
+  
           # Add this block to check if venv/bin/activate exists
           if [ ! -f "venv/bin/activate" ]; then
             echo "Error: venv/bin/activate not found!"
             exit 1
           fi
-
+  
           echo "Activating virtual environment..."
           source venv/bin/activate
-
+  
           echo "Installing project dependencies..."
           pip install --upgrade pip
           pip install -r requirements.txt
-
+  
           echo "Applying database migrations..."
           python manage.py migrate
-
+  
           echo "Collecting static files..."
           python manage.py collectstatic --noinput
-
+  
           echo "Deployment commands executed successfully."
         EOF
