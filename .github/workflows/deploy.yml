@@ -15,7 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
-          POSTGRES_HOST_AUTH_METHOD: trust  # Для упрощения тестирования
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - "5432:5432"
         options: >-
@@ -27,11 +27,11 @@ jobs:
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_DB_NAME: testdb
+      POSTGRES_DB: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-      DJANGO_SETTINGS_MODULE: booking_system.settings  # Явное указание модуля настроек
+      DJANGO_SETTINGS_MODULE: booking_system.settings
 
     steps:
     - uses: actions/checkout@v4
@@ -130,15 +130,6 @@ jobs:
         # Install dependencies
         pip install --upgrade pip
         pip install -r requirements.txt
-
-        # Set environment variables (using .env file or system environment is recommended)
-        export DJANGO_SETTINGS_MODULE=booking_system.settings
-        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-        export POSTGRES_USER="postgres"
-        export POSTGRES_PASSWORD="password"
-        export POSTGRES_DB="testdb"
-        export POSTGRES_HOST="localhost"
-        export POSTGRES_PORT="5432"
 
         # Apply migrations and collect static files
         python manage.py migrate --noinput
