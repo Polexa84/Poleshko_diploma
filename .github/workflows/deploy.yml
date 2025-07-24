@@ -15,6 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
+          POSTGRES_HOST_AUTH_METHOD: trust  # Для упрощения тестирования
         ports:
           - "5432:5432"
         options: >-
@@ -23,47 +24,63 @@ jobs:
           --health-timeout 5s
           --health-retries 3
 
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      DJANGO_SETTINGS_MODULE: booking_system.settings  # Явное указание модуля настроек
+
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libpq-dev
-        pip install --upgrade pip
-        pip install -r requirements.txt
+        sudo apt-get install -y libpq-dev python3-dev
 
-    - name: Prepare database
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
       run: |
-        echo "Waiting for PostgreSQL to start..."
-        export PGPASSWORD=$POSTGRES_PASSWORD
-        while ! pg_isready -h localhost -p 5432 -U $POSTGRES_USER -d postgres; do
-          echo "PostgreSQL is not ready yet, waiting..."
-          sleep 5
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt psycopg2-binary
+
+    - name: Verify PostgreSQL connection
+      run: |
+        echo "Waiting for PostgreSQL..."
+        for i in {1..20}; do
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
+            echo "PostgreSQL is ready!"
+            exit 0
+          fi
+          echo "Attempt $i/20 - Waiting for PostgreSQL..."
+          sleep 3
         done
-        echo "PostgreSQL is ready!"
-        psql -h localhost -v ON_ERROR_STOP=1 -U $POSTGRES_USER -d postgres -c "CREATE DATABASE $POSTGRES_DB;"
-        python manage.py migrate
-      env:
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: password
-        POSTGRES_DB: testdb
+        echo "Failed to connect to PostgreSQL after 20 attempts"
+        exit 1
+
+    - name: Create static directory
+      run: mkdir -p static
+
+    - name: Run migrations
+      run: python manage.py migrate --noinput
 
     - name: Run tests
-      run: python manage.py test --noinput
-      env:
-        DJANGO_SETTINGS_MODULE: myproject.settings # Укажите модуль настроек
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: 5432
-        POSTGRES_DB: testdb
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: password
-        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      run: python manage.py test --settings=booking_system.settings
 
   deploy:
     needs: test
@@ -86,6 +103,7 @@ jobs:
 
     - name: Copy project files to server
       run: |
+        echo "Copying project files to server..."
         export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
         rsync -avz --delete \
           --exclude '__pycache__' \
@@ -93,14 +111,17 @@ jobs:
           --exclude '.git' \
           --exclude 'venv' \
           . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+        echo "Files copied."
 
     - name: Deploy application
       run: |
+        echo "Executing deployment commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
         set -e
         set -x
         cd ${{ secrets.DEPLOY_DIR }}
 
+        # Create and activate virtual environment
         if [ ! -d "venv" ]; then
           python3 -m venv venv
         fi
@@ -110,8 +131,8 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
 
-        # Set environment variables (using .env file is recommended)
-        export DJANGO_SETTINGS_MODULE=myproject.settings
+        # Set environment variables (using .env file or system environment is recommended)
+        export DJANGO_SETTINGS_MODULE=booking_system.settings
         export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
         export POSTGRES_USER="postgres"
         export POSTGRES_PASSWORD="password"
@@ -126,6 +147,7 @@ jobs:
 
     - name: Restart services
       run: |
+        echo "Restarting application services..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
         set -e
         set -x
