@@ -117,18 +117,9 @@ jobs:
           set -e
           set -x
   
-          # Find pip
-          PIP_PATH=$(find /home/deployer/Poleshko_diploma/venv -name pip -executable -type f)
-  
-          # Check if pip was found
-          if [ -z "$PIP_PATH" ]; then
-            echo "Error: pip not found!"
-            exit 1
-          fi
-  
-          echo "Installing project dependencies using pip: $PIP_PATH"
-          "$PIP_PATH" install --upgrade pip
-          "$PIP_PATH" install -r requirements.txt
+          echo "Installing project dependencies..."
+          pip install --upgrade pip --break-system-packages
+          pip install -r requirements.txt --break-system-packages
   
           echo "Applying database migrations..."
           python manage.py migrate
