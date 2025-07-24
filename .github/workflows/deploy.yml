@@ -118,7 +118,7 @@ jobs:
           set -x
   
           # Find pip
-          PIP_PATH=$(find /home/deployer/Poleshko_diploma/venv -name pip -executable)
+          PIP_PATH=$(find /home/deployer/Poleshko_diploma/venv -name pip -executable -type f)
   
           # Check if pip was found
           if [ -z "$PIP_PATH" ]; then
