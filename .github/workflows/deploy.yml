@@ -15,6 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - "5432:5432"
         options: >-
@@ -22,6 +23,14 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_NAME: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
 
     steps:
     - uses: actions/checkout@v4
@@ -33,8 +42,23 @@ jobs:
 
     - name: Install dependencies
       run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev python3-dev
         python -m pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
+
+    - name: Wait for PostgreSQL
+      run: |
+        for i in {1..15}; do
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
+            echo "PostgreSQL ready!"
+            exit 0
+          fi
+          echo "Waiting for PostgreSQL... ($i/15)"
+          sleep 2
+        done
+        echo "PostgreSQL not ready!"
+        exit 1
 
     - name: Run migrations
       run: python manage.py migrate --noinput
@@ -94,17 +118,27 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-        echo "Setting environment variables..."
-        export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-        export POSTGRES_USER="postgres"
-        export POSTGRES_PASSWORD="password"
-        export POSTGRES_DB="testdb"
+        echo "Creating production environment file..."
+        cat > .env.prod <<EOL
+          DEBUG=False
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          POSTGRES_DB_NAME=testdb
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=password
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          EMAIL_HOST_USER=Elfinator84@yandex.ru
+          EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+          EOL
 
         echo "Applying migrations..."
-        python manage.py migrate
+        python manage.py migrate --noinput
 
         echo "Collecting static files..."
         python manage.py collectstatic --noinput
+
         echo "Deployment tasks completed successfully."
         DEPLOY
 
