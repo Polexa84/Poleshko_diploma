@@ -133,18 +133,18 @@ jobs:
 
         # Create production environment
         cat > .env.prod <<EOL
-DEBUG=False
-SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-POSTGRES_DB_NAME=testdb
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-REDIS_HOST=localhost
-REDIS_PORT=6379
-EMAIL_HOST_USER=Elfinator84@yandex.ru
-EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
-EOL
+        DEBUG=False
+        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_DB_NAME=testdb
+        POSTGRES_USER=postgres
+        POSTGRES_PASSWORD=password
+        POSTGRES_HOST=localhost
+        POSTGRES_PORT=5432
+        REDIS_HOST=localhost
+        REDIS_PORT=6379
+        EMAIL_HOST_USER=Elfinator84@yandex.ru
+        EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+        EOL
 
         # Execute Django commands
         python manage.py migrate --noinput
