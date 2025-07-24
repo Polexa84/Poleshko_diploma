@@ -28,6 +28,17 @@ jobs:
         ports:
           - "6379:6379"
 
+    env:
+      DJANGO_SETTINGS_MODULE: booking_system.settings_test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_NAME: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      REDIS_URL: redis://localhost:6379/0
+      EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+
     steps:
     - uses: actions/checkout@v4
 
@@ -54,33 +65,18 @@ jobs:
 
     - name: Wait for PostgreSQL
       run: |
-        echo "Waiting for PostgreSQL to be ready..."
+        echo "Waiting for PostgreSQL..."
         timeout 30s bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
-        echo "PostgreSQL is ready!"
+        echo "PostgreSQL ready!"
 
     - name: Run migrations
-      run: python manage.py migrate
-      env:
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: 5432
-        POSTGRES_DB_NAME: testdb
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: password
-        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-        REDIS_URL: redis://localhost:6379/0
-        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+      run: python manage.py migrate --noinput
 
     - name: Run tests
-      run: python manage.py test --noinput
+      run: |
+        python manage.py test --noinput
       env:
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: 5432
-        POSTGRES_DB_NAME: testdb
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: password
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-        REDIS_URL: redis://localhost:6379/0
-        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
   deploy:
     needs: test
@@ -115,7 +111,6 @@ jobs:
         set -e
         cd ${{ secrets.DEPLOY_DIR }}
 
-        # Create virtual environment if not exists
         if [ ! -d "venv" ]; then
           python3 -m venv venv
         fi
@@ -124,7 +119,6 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
 
-        # Create production .env if not exists
         if [ ! -f ".env.prod" ]; then
           cat > .env.prod <<EOL
         DEBUG=False
@@ -141,10 +135,8 @@ jobs:
         EOL
         fi
 
-        # Create static directory
         mkdir -p static
-
-        python manage.py migrate --settings=booking_system.settings.production
+        python manage.py migrate --noinput --settings=booking_system.settings.production
         python manage.py collectstatic --noinput --settings=booking_system.settings.production
 
         sudo systemctl restart gunicorn
