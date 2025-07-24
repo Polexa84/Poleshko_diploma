@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:8000 --workers 3 booking_system.wsgi:application
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8005:8000"
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - "5435:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6382:6379"
+
+  celery:
+    build: .
+    command: celery -A booking_system worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  celery-beat:
+    build: .
+    command: celery -A booking_system beat --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
