@@ -139,7 +139,7 @@ jobs:
         python manage.py collectstatic --noinput
 
         echo "Deployment tasks completed successfully."
-DEPLOY
+        DEPLOY
 
     - name: Restart services
       run: |
@@ -150,4 +150,4 @@ DEPLOY
         sudo systemctl restart gunicorn
         sudo systemctl reload nginx
         echo "Services restarted successfully."
-RESTART
+        RESTART
