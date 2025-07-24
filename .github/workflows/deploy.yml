@@ -5,45 +5,43 @@ on:
     branches:
       - develop_1
 
-env:
-  DJANGO_SETTINGS_MODULE: booking_system.settings
-  POSTGRES_DB_NAME: booking_system
-  POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-  REDIS_URL: redis://redis:6379/0
-
 jobs:
   test:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: booking_system
+        image: postgres:14
         ports:
           - "5432:5432"
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 3
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
 
       redis:
         image: redis:7-alpine
         ports:
           - "6379:6379"
 
-    steps:
-    - uses: actions/checkout@v4
+    env:
+      POSTGRES_DB_NAME: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      REDIS_URL: redis://redis:6379/0
 
-    - name: Set up Python 3.11
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
 
-    - name: Cache dependencies
+    - name: Cache pip
       uses: actions/cache@v3
       with:
         path: ~/.cache/pip
@@ -56,12 +54,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run migrations
+    - name: Set up database
+      working-directory: .
       run: python manage.py migrate
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
     - name: Run tests
-      run: |
-        python manage.py test --noinput
+      working-directory: .
+      run: python manage.py test --noinput
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
@@ -71,51 +73,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out code
+      uses: actions/checkout@v4
 
     - name: Set up SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Configure known hosts
+    - name: Add server host key to known_hosts
       run: |
         mkdir -p ~/.ssh
         ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
-    - name: Rsync project files
+    - name: Copy project files to server
       run: |
+        echo "Copying project files to server..."
+        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
         rsync -avz --delete \
           --exclude '__pycache__' \
           --exclude '.env*' \
           --exclude '.git' \
           --exclude 'venv' \
           . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+        echo "Files copied."
 
-    - name: Deploy on server
+    - name: Install dependencies, apply migrations, collect static files
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-        set -e
-        cd ${{ secrets.DEPLOY_DIR }}
+        echo "Executing commands on server..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+          
+          echo "Changing directory to deployment folder..."
+          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+          export POSTGRES_USER="postgres"
+          export POSTGRES_PASSWORD="password"
+          export POSTGRES_DB="testdb"
+          export EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
+          export REDIS_URL="redis://localhost:6379/0"
 
-        # Create virtual environment if not exists
-        if [ ! -d "venv" ]; then
-          python3 -m venv venv
-        fi
+          PROJECT_DIR="${{ secrets.DEPLOY_DIR }}"
+          cd "$PROJECT_DIR"
 
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
+          echo "Setting up virtual environment..."
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+          
+          echo "Activating virtual environment..."
+          source venv/bin/activate
 
-        # Create production .env if not exists
-        if [ ! -f ".env.prod" ]; then
+          echo "Installing project dependencies..."
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+          echo "Creating production environment file..."
           cat > .env.prod <<EOL
         DEBUG=False
         SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-        POSTGRES_DB_NAME=booking_system
+        POSTGRES_DB_NAME=testdb
         POSTGRES_USER=postgres
-        POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+        POSTGRES_PASSWORD=password
         POSTGRES_HOST=localhost
         POSTGRES_PORT=5432
         REDIS_HOST=localhost
@@ -123,12 +143,24 @@ jobs:
         EMAIL_HOST_USER=Elfinator84@yandex.ru
         EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
         EOL
-        fi
 
-        export DJANGO_SETTINGS_MODULE=booking_system.settings.production
-        python manage.py migrate
-        python manage.py collectstatic --noinput
+          echo "Applying database migrations..."
+          python manage.py migrate --settings=booking_system.settings.production
 
-        sudo systemctl restart gunicorn
-        sudo systemctl reload nginx
+          echo "Collecting static files..."
+          python manage.py collectstatic --noinput --settings=booking_system.settings.production
+
+          echo "Deployment commands executed successfully."
         EOF
+        echo "Commands executed on server."
+
+    - name: Restart application
+      run: |
+        echo "Restarting application..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+          sudo systemctl restart gunicorn
+          sudo systemctl reload nginx
+        EOF
+        echo "Application restarted."
