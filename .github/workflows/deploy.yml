@@ -29,14 +29,15 @@ jobs:
           - "6379:6379"
 
     env:
-      DJANGO_SETTINGS_MODULE: booking_system.settings_test
+      # Используем основные настройки вместо settings_test
+      DJANGO_SETTINGS_MODULE: booking_system.settings
       SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-      POSTGRES_HOST: postgres  # Изменено с localhost на postgres
+      POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: testdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      REDIS_URL: redis://redis:6379/0  # Изменено с localhost на redis
+      REDIS_URL: redis://redis:6379/0
       EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
     steps:
@@ -46,9 +47,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-
-    - name: Create static directory
-      run: mkdir -p static
 
     - name: Install system dependencies
       run: |
@@ -66,12 +64,11 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install psycopg2-binary
+        pip install -r requirements.txt psycopg2-binary
 
     - name: Wait for PostgreSQL
       run: |
-        echo "Waiting for PostgreSQL to be ready..."
+        echo "Waiting for PostgreSQL..."
         for i in {1..30}; do
           if pg_isready -h postgres -p 5432; then
             echo "PostgreSQL is ready!"
@@ -83,7 +80,6 @@ jobs:
 
     - name: Run migrations
       run: |
-        python manage.py check --database default
         python manage.py migrate --noinput
 
     - name: Run tests
@@ -132,20 +128,19 @@ jobs:
         pip install -r requirements.txt psycopg2-binary
 
         cat > .env.prod <<EOL
-        SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-        DEBUG=False
-        POSTGRES_DB_NAME=testdb
-        POSTGRES_USER=postgres
-        POSTGRES_PASSWORD=password
-        POSTGRES_HOST=localhost
-        POSTGRES_PORT=5432
-        REDIS_HOST=localhost
-        REDIS_PORT=6379
-        EMAIL_HOST_USER=Elfinator84@yandex.ru
-        EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
-        EOL
+SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+DEBUG=False
+POSTGRES_DB_NAME=testdb
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+REDIS_HOST=localhost
+REDIS_PORT=6379
+EMAIL_HOST_USER=Elfinator84@yandex.ru
+EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+EOL
 
-        mkdir -p static
         python manage.py migrate --noinput
         python manage.py collectstatic --noinput
 
