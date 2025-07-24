@@ -75,7 +75,7 @@ jobs:
 
     - name: Run tests
       working-directory: .
-      run: python manage.py test --settings=habit_tracker.settings_test
+      run: python manage.py test --settings=booking_system.settings
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         POSTGRES_HOST: localhost
