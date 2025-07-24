@@ -134,7 +134,13 @@ jobs:
 
           echo "Creating virtual environment..."
           if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
             python3 -m venv venv
+            # Check if the venv directory was actually created
+            if [ ! -d "venv" ]; then
+              echo "Error: venv directory was not created!"
+              exit 1
+            fi
           fi
 
           # Add this block to check if venv/bin/activate exists
@@ -157,15 +163,4 @@ jobs:
           python manage.py collectstatic --noinput
 
           echo "Deployment commands executed successfully."
-        EOF
-
-    - name: Restart services
-      run: |
-        echo "Restarting application services..."
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e
-          set -x
-          sudo systemctl restart gunicorn
-          sudo systemctl reload nginx
-          echo "Services restarted successfully."
         EOF
