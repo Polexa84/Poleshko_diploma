@@ -135,6 +135,15 @@ jobs:
           # Use an absolute path for the venv directory
           VENV_DIR="$PROJECT_DIR/venv"
   
+          # Add debugging information
+          echo "PROJECT_DIR: $PROJECT_DIR"
+          echo "VENV_DIR: $VENV_DIR"
+  
+          echo "Checking if venv directory exists: ls -l $PROJECT_DIR"
+          ls -l "$PROJECT_DIR"
+          echo "Checking if activate script exists: ls -l $VENV_DIR/bin"
+          ls -l "$VENV_DIR/bin"
+  
           # Assume venv already exists
           if [ ! -f "$VENV_DIR/bin/activate" ]; then
             echo "Error: venv/bin/activate not found!"
