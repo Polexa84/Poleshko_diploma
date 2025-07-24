@@ -15,7 +15,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
-          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_HOST_AUTH_METHOD: trust  # Перенесено внутрь env
         ports:
           - "5432:5432"
         options: >-
@@ -33,97 +33,114 @@ jobs:
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out code
+      uses: actions/checkout@v4
 
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y libpq-dev python3-dev
+
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt psycopg2-binary
 
-    - name: Wait for PostgreSQL
+    - name: Verify PostgreSQL connection
       run: |
-        for i in {1..15}; do
+        echo "Waiting for PostgreSQL..."
+        for i in {1..20}; do
           if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
-            echo "PostgreSQL ready!"
+            echo "PostgreSQL is ready!"
             exit 0
           fi
-          echo "Waiting for PostgreSQL... ($i/15)"
-          sleep 2
+          echo "Attempt $i/20 - Waiting for PostgreSQL..."
+          sleep 3
         done
-        echo "PostgreSQL not ready!"
+        echo "Failed to connect to PostgreSQL after 20 attempts"
         exit 1
+
+    - name: Create static directory
+      run: mkdir -p static
 
     - name: Run migrations
       run: python manage.py migrate --noinput
 
     - name: Run tests
-      run: python manage.py test --noinput
+      run: python manage.py test --settings=booking_system.settings
 
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
+      deploy:
+        needs: test
+        runs-on: ubuntu-latest
 
-    - name: Install SSH key
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        steps:
+          - uses: actions/checkout@v4
 
-    - name: Add server to known hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
-        chmod 600 ~/.ssh/known_hosts
+          - name: Install SSH key
+            uses: webfactory/ssh-agent@v0.8.0
+            with:
+              ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Rsync files to server
-      run: |
-        rsync -avz --delete \
-          --exclude '.git' \
-          --exclude '.env' \
-          --exclude 'venv' \
-          --exclude '__pycache__' \
-          ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.PROJECT_PATH }}
+          - name: Add server to known hosts
+            run: |
+              mkdir -p ~/.ssh
+              ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+              chmod 600 ~/.ssh/known_hosts
 
-    - name: Execute deployment commands
-      run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
-        set -e
-        cd ${{ secrets.PROJECT_PATH }}
-        
-        # Setup virtual environment
-        if [ ! -d "venv" ]; then
-          python3 -m venv venv
-        fi
-        
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt psycopg2-binary
+          - name: Rsync files to server
+            run: |
+              rsync -avz --delete \
+                --exclude '.git' \
+                --exclude '.env' \
+                --exclude 'venv' \
+                --exclude '__pycache__' \
+                ./ ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.PROJECT_PATH }}
 
-        # Configure environment
-        cat > .env <<EOL
-DEBUG=False
-SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-POSTGRES_DB_NAME=testdb
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-EOL
+          - name: Execute deployment commands
+            run: |
+              ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
+              set -e
+              cd ${{ secrets.PROJECT_PATH }}
 
-        # Django commands
-        python manage.py migrate --noinput
-        python manage.py collectstatic --noinput
+              # Setup virtual environment
+              if [ ! -d "venv" ]; then
+                python3 -m venv venv
+              fi
 
-        # Restart services
-        sudo systemctl restart gunicorn
-        sudo systemctl reload nginx
-DEPLOY
+              source venv/bin/activate
+              pip install --upgrade pip
+              pip install -r requirements.txt psycopg2-binary
+
+              # Configure environment
+              cat > .env <<EOL
+      DEBUG=False
+      SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+      POSTGRES_DB_NAME=testdb
+      POSTGRES_USER=postgres
+      POSTGRES_PASSWORD=password
+      POSTGRES_HOST=localhost
+      POSTGRES_PORT=5432
+      EOL
+      
+      # Django commands
+      python manage.py migrate --noinput
+      python manage.py collectstatic --noinput
+      
+      # Restart services
+      sudo systemctl restart gunicorn
+      sudo systemctl reload nginx
+      DEPLOY
