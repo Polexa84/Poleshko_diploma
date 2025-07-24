@@ -1,0 +1,132 @@
+name: Django CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop_1
+
+env:
+  DJANGO_SETTINGS_MODULE: booking_system.settings
+  POSTGRES_DB_NAME: booking_system
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: новый_пароль
+  REDIS_URL: redis://redis:6379/0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: новый_пароль
+          POSTGRES_DB: booking_system
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run migrations
+      run: python manage.py migrate
+
+    - name: Run tests
+      run: |
+        python manage.py test --noinput
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Configure known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Rsync project files
+      run: |
+        rsync -avz --delete \
+          --exclude '__pycache__' \
+          --exclude '.env' \
+          --exclude '.git' \
+          --exclude 'venv' \
+          . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+
+    - name: Deploy on server
+      run: |
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+        set -e
+        cd ${{ secrets.DEPLOY_DIR }}
+
+        # Create virtual environment if not exists
+        if [ ! -d "venv" ]; then
+          python3 -m venv venv
+        fi
+
+        source venv/bin/activate
+        pip install -r requirements.txt
+
+        # Create production .env if not exists
+        if [ ! -f ".env.prod" ]; then
+          cat > .env.prod <<EOL
+          DEBUG=False
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          POSTGRES_DB_NAME=booking_system
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=новый_пароль
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          EMAIL_HOST_USER=Elfinator84@yandex.ru
+          EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+          EOL
+        fi
+
+        python manage.py migrate --settings=booking_system.settings.production
+        python manage.py collectstatic --noinput --settings=booking_system.settings.production
+
+        sudo systemctl restart gunicorn
+        sudo systemctl reload nginx
+        EOF
