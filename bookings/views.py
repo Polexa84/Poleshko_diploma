@@ -25,12 +25,14 @@ def restaurant_booking(request, restaurant_id):
     selected_table_id = request.GET.get('table')
 
     if not selected_table_id:
-        return render(request, 'bookings/no_table_selected.html', {'restaurant': restaurant})
+        messages.error(request, "Пожалуйста, выберите столик")
+        return redirect('restaurant_detail', restaurant_id=restaurant.id)  # Перенаправляем на страницу ресторана
 
     try:
         selected_table = restaurant.tables.get(pk=selected_table_id)
     except Table.DoesNotExist:
-        return render(request, 'bookings/table_not_found.html', {'restaurant': restaurant})
+        messages.error(request, "Выбранный столик не найден")
+        return redirect('restaurant_detail', restaurant_id=restaurant.id)
 
     form = BookingForm(initial={'date': timezone.now().date()})
 
