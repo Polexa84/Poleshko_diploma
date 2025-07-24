@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block content %}
     <div class="container">
@@ -15,35 +16,12 @@
         {% endif %}
 
         {# Date selection form #}
-        <form method="get">
-            <label for="date">Выберите дату:</label>
-            <input type="date" id="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
-            <input type="hidden" name="table" value="{{ selected_table.id }}">
-            <button type="submit">Показать доступное время</button>
+        <form method="get" action="{% url 'available_times' restaurant.id selected_table.id %}">
+            <div class="form-group">
+                <label for="{{ form.date.id_for_label }}">Выберите дату:</label>
+                {% render_field form.date class="form-control" %}
+            </div>
+            <button type="submit" class="btn btn-primary">Показать доступное время</button>
         </form>
-
-        {% if has_available_times %}
-            {# Time selection form #}
-            <form method="post">
-                {% csrf_token %}
-                {% if form.errors %}
-                    <div class="alert alert-danger" role="alert">
-                        Пожалуйста, исправьте следующие ошибки:
-                    </div>
-                {% endif %}
-
-                <div class="mb-3">
-                    <h5>Выберите время бронирования:</h5>
-                    {% for time_slot in available_times %}
-                        <button type="submit" name="booking_time" value="{{ time_slot.start_time }}" class="btn btn-outline-primary">{{ time_slot.display_time }}</button>
-                    {% endfor %}
-                </div>
-
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-primary">Забронировать</button>
-            </form>
-        {% else %}
-            <p>Нет доступного времени для бронирования столика на выбранную дату.</p>
-        {% endif %}
     </div>
 {% endblock %}
