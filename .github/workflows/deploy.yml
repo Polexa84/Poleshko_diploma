@@ -116,19 +116,21 @@ jobs:
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e  # Выходить при первой ошибке
           set -x  # Подробный вывод выполняемых команд
+
+          echo "Checking Python version..."
+          python3 --version
+
           echo "Changing directory to deployment folder..."
-
           PROJECT_DIR="${{ secrets.DEPLOY_DIR }}" # Используйте переменную DEPLOY_DIR
-
           cd "$PROJECT_DIR"
 
           echo "Setting environment variables..."
           export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
-          export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
-          export POSTGRES_DB="testdb" # <---- Добавляем переменные для базы данных
-          export POSTGRES_HOST="localhost" # Add the host
-          export POSTGRES_PORT="5432" # Add the port
+          export POSTGRES_USER="postgres"
+          export POSTGRES_PASSWORD="password"
+          export POSTGRES_DB="testdb"
+          export POSTGRES_HOST="localhost"
+          export POSTGRES_PORT="5432"
 
           echo "Creating virtual environment..."
           if [ ! -d "venv" ]; then
