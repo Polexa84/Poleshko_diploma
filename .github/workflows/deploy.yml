@@ -81,3 +81,90 @@ jobs:
 
     - name: Run tests
       run: python manage.py test --settings=booking_system.settings
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Add server host key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Copy project files to server
+        run: |
+          echo "Copying project files to server..."
+          export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
+          rsync -avz --delete \
+            --exclude '__pycache__' \
+            --exclude '.env*' \
+            --exclude '.git' \
+            --exclude 'venv' \
+            . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+          echo "Files copied."
+
+      - name: Install dependencies and deploy
+        run: |
+          echo "Executing deployment commands on server..."
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
+          set -e
+          set -x
+          echo "Changing to project directory..."
+          cd ${{ secrets.DEPLOY_DIR }}
+
+          echo "Setting up virtual environment..."
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+
+          echo "Activating virtual environment..."
+          source venv/bin/activate
+
+          echo "Installing dependencies..."
+          pip install --upgrade pip
+          pip install -r requirements.txt psycopg2-binary
+
+          echo "Creating production environment file..."
+          cat > .env.prod <<EOL
+  DEBUG=False
+  SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+  POSTGRES_DB_NAME=testdb
+  POSTGRES_USER=postgres
+  POSTGRES_PASSWORD=password
+  POSTGRES_HOST=localhost
+  POSTGRES_PORT=5432
+  REDIS_HOST=localhost
+  REDIS_PORT=6379
+  EMAIL_HOST_USER=Elfinator84@yandex.ru
+  EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+  EOL
+  
+  echo "Applying migrations..."
+  python manage.py migrate --noinput
+  
+  echo "Collecting static files..."
+  python manage.py collectstatic --noinput
+  
+  echo "Deployment tasks completed successfully."
+  DEPLOY
+
+  - name: Restart services
+    run: |
+      echo "Restarting application services..."
+      ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
+      set -e
+      set -x
+      sudo systemctl restart gunicorn
+      sudo systemctl reload nginx
+      echo "Services restarted successfully."
+  RESTART
