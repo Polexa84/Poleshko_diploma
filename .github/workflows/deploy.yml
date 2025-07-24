@@ -36,6 +36,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Debug environment variables
+      run: |
+        echo "POSTGRES_DB: $POSTGRES_DB"
+        echo "POSTGRES_USER: $POSTGRES_USER"
+        echo "POSTGRES_PASSWORD: $POSTGRES_PASSWORD"
+        echo "DJANGO_SECRET_KEY: $DJANGO_SECRET_KEY"
+        echo "DJANGO_SETTINGS_MODULE: $DJANGO_SETTINGS_MODULE"
+
     - name: Set up Python 3.10
       uses: actions/setup-python@v4
       with:
