@@ -13,7 +13,7 @@ jobs:
         image: postgres:14
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password  # Должно совпадать с POSTGRES_PASSWORD в env
+          POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
         ports:
           - "5432:5432"
@@ -31,36 +31,28 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: Create static directory
-      run: mkdir -p static
-
     - name: Install dependencies
       run: |
+        sudo apt-get update
         sudo apt-get install -y libpq-dev
-        pip install -r requirements.txt psycopg2-binary
+        pip install --upgrade pip
+        pip install -r requirements.txt
 
-    - name: Wait for PostgreSQL
+    - name: Prepare database
       run: |
-        for i in {1..10}; do
-          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
-            exit 0
-          fi
-          sleep 2
-        done
-        exit 1
+        python manage.py dbshell -c "CREATE DATABASE testdb;"
+        python manage.py migrate
 
-    - name: Run migrations
-      run: python manage.py migrate --noinput
+    - name: Run tests
+      run: python manage.py test --noinput
       env:
+        DJANGO_SETTINGS_MODULE: myproject.settings # Укажите модуль настроек
         POSTGRES_HOST: localhost
         POSTGRES_PORT: 5432
         POSTGRES_DB: testdb
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: password
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
-
-    - name: Run tests
-      run: python manage.py test --noinput
 
   deploy:
     needs: test
@@ -83,7 +75,6 @@ jobs:
 
     - name: Copy project files to server
       run: |
-        echo "Copying project files to server..."
         export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
         rsync -avz --delete \
           --exclude '__pycache__' \
@@ -91,46 +82,39 @@ jobs:
           --exclude '.git' \
           --exclude 'venv' \
           . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
-        echo "Files copied."
 
-    - name: Install dependencies and deploy
+    - name: Deploy application
       run: |
-        echo "Executing deployment commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
         set -e
         set -x
-        echo "Changing to project directory..."
         cd ${{ secrets.DEPLOY_DIR }}
 
-        echo "Setting up virtual environment..."
         if [ ! -d "venv" ]; then
           python3 -m venv venv
         fi
-
-        echo "Activating virtual environment..."
         source venv/bin/activate
 
-        echo "Installing dependencies..."
+        # Install dependencies
         pip install --upgrade pip
-        pip install -r requirements.txt psycopg2-binary
+        pip install -r requirements.txt
 
-        echo "Setting environment variables..."
+        # Set environment variables (using .env file is recommended)
+        export DJANGO_SETTINGS_MODULE=myproject.settings
         export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
         export POSTGRES_USER="postgres"
         export POSTGRES_PASSWORD="password"
         export POSTGRES_DB="testdb"
 
-        echo "Applying migrations..."
-        python manage.py migrate
-
-        echo "Collecting static files..."
+        # Apply migrations and collect static files
+        python manage.py migrate --noinput
         python manage.py collectstatic --noinput
-        echo "Deployment tasks completed successfully."
+
+        echo "Deployment completed successfully."
         DEPLOY
 
     - name: Restart services
       run: |
-        echo "Restarting application services..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
         set -e
         set -x
