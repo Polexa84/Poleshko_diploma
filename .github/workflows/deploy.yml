@@ -117,6 +117,9 @@ jobs:
           set -e
           set -x
   
+          # Change directory to project directory
+          cd ${{ secrets.DEPLOY_DIR }}
+  
           # Print current working directory
           pwd
   
