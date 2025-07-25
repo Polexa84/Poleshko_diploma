@@ -146,10 +146,6 @@ jobs:
           python manage.py migrate users
           python manage.py migrate restaurants
           python manage.py migrate tables
-          python manage.py migrate bookings
-          
-          echo "Applying any remaining migrations..."
-          python manage.py migrate
           
           echo "Collecting static files..."
           python manage.py collectstatic --noinput
