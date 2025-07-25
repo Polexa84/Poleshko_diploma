@@ -10,16 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:14
-        ports:
-          - "5432:5432"
-        env:
+        image: postgres:latest
+        environment:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: testdb
-          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - "5432:5432"
         options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+          --health-cmd pg_isready --health-timeout 10s
+
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
@@ -64,7 +64,8 @@ jobs:
 
     - name: Set up database
       working-directory: .
-      run: python manage.py migrate
+      run: |
+        python manage.py migrate
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         POSTGRES_HOST: localhost
@@ -106,32 +107,31 @@ jobs:
     - name: Copy project files to server
       run: |
         echo "Copying project files to server..."
-        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"  # <---- Указываем опцию для ssh
-        rsync -avz --delete --exclude '__pycache__' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
+        rsync -avz --delete --exclude '__pycache__' --exclude 'venv' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
     - name: Install dependencies, apply migrations, collect static files
       run: |
         echo "Executing commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e  # Выходить при первой ошибке
-          set -x  # Подробный вывод выполняемых команд
+          set -e
+          set -x
           echo "Changing directory to deployment folder..."
-          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
-          export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
-          export POSTGRES_DB="testdb" # <---- Добавляем переменные для базы данных
-
           PROJECT_DIR="/home/deployer/Poleshko_diploma"
           cd "$PROJECT_DIR"
 
           echo "Creating virtual environment..."
-          python3 -m venv venv  # <---- Создаем виртуальное окружение
+          python3 -m venv venv
           echo "Activating virtual environment..."
-          source /home/deployer/Poleshko_diploma/venv/bin/activate
+          source "$PROJECT_DIR/venv/bin/activate"
 
           echo "Installing project dependencies..."
           pip install -r requirements.txt
+
+          echo "Loading environment variables from .env..."
+          export $(cat .env | xargs)
+
           echo "Applying database migrations..."
           python manage.py migrate
           echo "Collecting static files..."
@@ -146,7 +146,7 @@ jobs:
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e
           set -x
-          sudo systemctl restart gunicorn.service  # Имя сервиса
-          sudo systemctl reload nginx  # Перезагрузка Nginx
+          sudo systemctl restart gunicorn.service
+          sudo systemctl reload nginx
         EOF
         echo "Application restarted."
