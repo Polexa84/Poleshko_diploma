@@ -132,12 +132,20 @@ jobs:
 
           echo "Installing project dependencies..."
           pip install -r requirements.txt
-          echo "Applying database migrations..."
+          
+          echo "Applying core migrations first..."
+          python manage.py migrate auth
+          python manage.py migrate contenttypes
+          python manage.py migrate sessions
+          python manage.py migrate admin
+          
+          echo "Applying project migrations..."
           python manage.py migrate
+          
           echo "Collecting static files..."
+          python manage.py collectstatic --noinput
+          
           echo "Deployment commands executed successfully."
-        EOF
-        echo "Commands executed on server."
 
     - name: Restart application
       run: |
