@@ -110,31 +110,41 @@ jobs:
           rsync -avz --delete \
             --exclude '__pycache__' \
             --exclude 'venv' \
+            --exclude '.env' \
             . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
           echo "Files copied."
 
-      - name: Configure PostgreSQL and setup environment
+      - name: Configure PostgreSQL
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'POSTGRES_SETUP'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'PG_SETUP'
           set -ex
-          # Настройка аутентификации PostgreSQL
-          sudo sed -i 's/local   all             postgres                                peer/local   all             postgres                                md5/' /etc/postgresql/*/main/pg_hba.conf
-          sudo systemctl restart postgresql
-  
-          # Установка пароля для пользователя postgres
+          # Резервное копирование и полная перезапись pg_hba.conf
+          sudo cp /etc/postgresql/16/main/pg_hba.conf /etc/postgresql/16/main/pg_hba.conf.bak
+          echo "local   all             postgres                                md5" | sudo tee /etc/postgresql/16/main/pg_hba.conf
+          echo "host    all             all             127.0.0.1/32            md5" | sudo tee -a /etc/postgresql/16/main/pg_hba.conf
+          echo "host    all             all             ::1/128                 md5" | sudo tee -a /etc/postgresql/16/main/pg_hba.conf
+          
+          # Принудительный рестарт PostgreSQL
+          sudo systemctl stop postgresql
+          sudo systemctl start postgresql
+          
+          # Установка пароля
           sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
           
-          # Создание БД (если не существует)
+          # Создание БД если не существует
           sudo -u postgres psql -c "CREATE DATABASE testdb WITH OWNER postgres;"
-          POSTGRES_SETUP
+          
+          # Проверка подключения
+          PGPASSWORD="password" psql -h localhost -U postgres -d testdb -c "SELECT 1;"
+          PG_SETUP
 
-      - name: Install dependencies and apply migrations
+      - name: Setup Python environment
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'ENV_SETUP'
           set -ex
           cd "${{ secrets.DEPLOY_DIR }}"
           
-          # Создание и активация venv
+          # Создание venv
           python3 -m venv venv
           source venv/bin/activate
           
@@ -142,26 +152,52 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           
-          # Применение миграций с явным указанием параметров подключения
-          export PGHOST=localhost
-          export PGPORT=5432
-          export PGUSER=postgres
-          export PGPASSWORD=password
-          export PGDATABASE=testdb
+          # Создание .env файла
+          cat > .env <<EOL
+          DEBUG=False
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          POSTGRES_DB=testdb
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=password
+          POSTGRES_HOST=localhost
+          POSTGRES_PORT=5432
+          EOL
+          ENV_SETUP
+
+      - name: Apply migrations
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'MIGRATE'
+          set -ex
+          cd "${{ secrets.DEPLOY_DIR }}"
+          source venv/bin/activate
           
-          python manage.py migrate --noinput
+          # Применение миграций в правильном порядке
+          python manage.py migrate contenttypes
+          python manage.py migrate auth
+          python manage.py migrate admin
+          python manage.py migrate sessions
+          python manage.py migrate
           
           # Создание суперпользователя
           echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@example.com', 'password') if not User.objects.exists() else None" | python manage.py shell
           
           # Сбор статики
+          mkdir -p static
           python manage.py collectstatic --noinput
-          DEPLOY
+          MIGRATE
 
       - name: Restart services
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
           set -ex
+          # Настройка прав
+          sudo chown -R deployer:www-data ${{ secrets.DEPLOY_DIR }}
+          sudo chmod -R 755 ${{ secrets.DEPLOY_DIR }}/static
+          
+          # Перезапуск сервисов
           sudo systemctl restart gunicorn
           sudo systemctl reload nginx
+          
+          # Очистка zombie процессов если есть
+          sudo kill -HUP $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}') || true
           RESTART
