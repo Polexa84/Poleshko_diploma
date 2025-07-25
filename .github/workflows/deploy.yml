@@ -89,63 +89,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Check out code
-      uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
 
-    - name: Set up SSH
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_KEY }}
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
 
-    - name: Add server host key to known_hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
-        chmod 600 ~/.ssh/known_hosts
+      - name: Add server host key to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
-    - name: Copy project files to server
-      run: |
-        echo "Copying project files to server..."
-        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"  # <---- Указываем опцию для ssh
-        rsync -avz --delete --exclude '__pycache__' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
-        echo "Files copied."
+      - name: Copy project files to server
+        run: |
+          echo "Copying project files to server..."
+          export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
+          rsync -avz --delete \
+            --exclude '__pycache__' \
+            --exclude 'venv' \
+            . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
 
-    - name: Install dependencies, apply migrations, collect static files
-      run: |
-        echo "Executing commands on server..."
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e  # Выходить при первой ошибке
-          set -x  # Подробный вывод выполняемых команд
-          echo "Changing directory to deployment folder..."
-          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
-          export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
-          export POSTGRES_DB="testdb" # <---- Добавляем переменные для базы данных
-
-          PROJECT_DIR="/home/deployer/Poleshko_diploma"
-          cd "$PROJECT_DIR"
-
-          echo "Creating virtual environment..."
-          python3 -m venv venv  # <---- Создаем виртуальное окружение
-          echo "Activating virtual environment..."
-          source /home/deployer/Poleshko_diploma/venv/bin/activate
-
-          echo "Installing project dependencies..."
-          pip install -r requirements.txt
-          echo "Applying database migrations..."
-          python manage.py migrate
-          python manage.py collectstatic --noinput
-          echo "Deployment commands executed successfully."
-        EOF
-        echo "Commands executed on server."
-
-    - name: Restart application
-      run: |
-        echo "Restarting application..."
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+      - name: Install dependencies and configure
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
           set -e
           set -x
-          sudo systemctl restart gunicorn.service  # Имя сервиса
-          sudo systemctl reload nginx  # Перезагрузка Nginx
-        EOF
-        echo "Application restarted."
+          
+          # Настройка PostgreSQL
+          echo "Configuring PostgreSQL..."
+          sudo sed -i 's/peer/md5/' /etc/postgresql/*/main/pg_hba.conf
+          sudo systemctl restart postgresql
+          
+          # Настройка проекта
+          cd "/home/deployer/Poleshko_diploma"
+          
+          # Python environment
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Static files
+          mkdir -p static
+          chmod 755 static
+          
+          # Database
+          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+          python manage.py migrate
+          python manage.py collectstatic --noinput
+          DEPLOY
+
+      - name: Restart services
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
+          set -e
+          sudo systemctl restart gunicorn
+          sudo systemctl reload nginx
+          RESTART
