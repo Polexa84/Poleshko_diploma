@@ -116,6 +116,9 @@ jobs:
           export POSTGRES_DB="testdb"
           export PROJECT_DIR="/home/deployer/Poleshko_diploma"
   
+          # Provide password for postgres user
+          export PGPASSWORD="$POSTGRES_PASSWORD"
+  
           # Drop database if exists
           echo "Dropping database..."
           psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS $POSTGRES_DB" || { echo "Error dropping database"; exit 1; }
