@@ -103,76 +103,39 @@ jobs:
         ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
-    - name: Reset environment
-      run: |
-        echo "Resetting environment..."
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e
-          set -x
-  
-          echo "Setting environment variables..."
-          export POSTGRES_USER="postgres"
-          export POSTGRES_PASSWORD="password"
-          export POSTGRES_DB="testdb"
-          export PROJECT_DIR="/home/deployer/Poleshko_diploma"
-  
-          # Provide password for postgres user
-          export PGPASSWORD="$POSTGRES_PASSWORD"
-  
-          # Drop database if exists
-          echo "Dropping database..."
-          psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS $POSTGRES_DB" || { echo "Error dropping database"; exit 1; }
-  
-          # Remove project directory if exists
-          echo "Removing project directory..."
-          rm -rf "$PROJECT_DIR" || { echo "Error removing project directory"; exit 1; }
-  
-          echo "Environment reset successfully."
-        EOF
-        echo "Environment reset on server."
-
     - name: Copy project files to server
       run: |
         echo "Copying project files to server..."
-        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
-        rsync -avz --delete --exclude '__pycache__' --exclude 'venv' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"  # <---- Указываем опцию для ssh
+        rsync -avz --delete --exclude '__pycache__' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
     - name: Install dependencies, apply migrations, collect static files
       run: |
         echo "Executing commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e
-          set -x
-  
-          echo "Setting environment variables..."
+          set -e  # Выходить при первой ошибке
+          set -x  # Подробный вывод выполняемых команд
+          echo "Changing directory to deployment folder..."
           export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres"
-          export POSTGRES_PASSWORD="password"
-          export POSTGRES_DB="testdb"
-          export POSTGRES_HOST="localhost"
-          export POSTGRES_PORT="5432"
-  
+          export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
+          export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
+          export POSTGRES_DB="testdb" # <---- Добавляем переменные для базы данных
+
           PROJECT_DIR="/home/deployer/Poleshko_diploma"
-          VENV_DIR="$PROJECT_DIR/venv"
           cd "$PROJECT_DIR"
-  
+
           echo "Creating virtual environment..."
-          python3 -m venv venv || { echo "Error creating virtual environment"; exit 1; }
-  
+          python3 -m venv venv  # <---- Создаем виртуальное окружение
           echo "Activating virtual environment..."
-          source "$VENV_DIR/bin/activate" || { echo "Error activating virtual environment"; exit 1; }
-  
+          source /home/deployer/Poleshko_diploma/venv/bin/activate
+
           echo "Installing project dependencies..."
-          "$VENV_DIR/bin/pip" install --upgrade pip || { echo "Error upgrading pip"; exit 1; }
-          "$VENV_DIR/bin/pip" install -r requirements.txt || { echo "Error installing dependencies"; exit 1; }
-  
+          pip install -r requirements.txt
           echo "Applying database migrations..."
-          "$VENV_DIR/bin/python" manage.py migrate || { echo "Error applying migrations"; exit 1; }
-  
+          python manage.py migrate
           echo "Collecting static files..."
-          "$VENV_DIR/bin/python" manage.py collectstatic --noinput || { echo "Error collecting static files"; exit 1; }
-  
+          python manage.py collectstatic --noinput
           echo "Deployment commands executed successfully."
         EOF
         echo "Commands executed on server."
@@ -183,11 +146,7 @@ jobs:
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e
           set -x
-          if systemctl is-active --quiet gunicorn.service; then
-            sudo systemctl restart gunicorn.service
-          else
-            echo "Gunicorn service is not running."
-          fi
-          sudo systemctl reload nginx
+          sudo systemctl restart gunicorn.service  # Имя сервиса
+          sudo systemctl reload nginx  # Перезагрузка Nginx
         EOF
         echo "Application restarted."
