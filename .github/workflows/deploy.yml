@@ -16,14 +16,14 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: testdb
+          POSTGRES_DB: testdb1
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
     env:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_DB_NAME: testdb
+      POSTGRES_DB_NAME: testdb1
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -69,7 +69,7 @@ jobs:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         POSTGRES_HOST: localhost
         POSTGRES_PORT: 5432
-        POSTGRES_DB: testdb
+        POSTGRES_DB: testdb1
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: password
 
@@ -80,7 +80,7 @@ jobs:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         POSTGRES_HOST: localhost
         POSTGRES_PORT: 5432
-        POSTGRES_DB: testdb
+        POSTGRES_DB: testdb1
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: password
 
@@ -120,7 +120,7 @@ jobs:
           export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
           export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
           export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
-          export POSTGRES_DB="testdb" # <---- Добавляем переменные для базы данных
+          export POSTGRES_DB="testdb1" # <---- Добавляем переменные для базы данных
 
           PROJECT_DIR="/home/deployer/Poleshko_diploma"
           cd "$PROJECT_DIR"
