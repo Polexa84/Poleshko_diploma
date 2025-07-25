@@ -113,64 +113,55 @@ jobs:
             . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
           echo "Files copied."
 
-      - name: Install dependencies and setup
+      - name: Configure PostgreSQL and setup environment
         run: |
-          echo "Executing commands on server..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'SETUP'
-          set -e
-          set -x
-          
-          echo "Changing directory to deployment folder..."
-          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
-          export POSTGRES_USER="postgres"
-          export POSTGRES_PASSWORD="password"
-          export POSTGRES_DB="testdb"
-          
-          PROJECT_DIR="${{ secrets.DEPLOY_DIR }}"
-          cd "$PROJECT_DIR"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'POSTGRES_SETUP'
+          set -ex
+          # Настройка аутентификации PostgreSQL
+          sudo sed -i 's/local   all             postgres                                peer/local   all             postgres                                md5/' /etc/postgresql/*/main/pg_hba.conf
+          sudo systemctl restart postgresql
   
-          echo "Creating virtual environment..."
+          # Установка пароля для пользователя postgres
+          sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password';"
+          
+          # Создание БД (если не существует)
+          sudo -u postgres psql -c "CREATE DATABASE testdb WITH OWNER postgres;"
+          POSTGRES_SETUP
+
+      - name: Install dependencies and apply migrations
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
+          set -ex
+          cd "${{ secrets.DEPLOY_DIR }}"
+          
+          # Создание и активация venv
           python3 -m venv venv
           source venv/bin/activate
-  
-          echo "Installing project dependencies..."
+          
+          # Установка зависимостей
           pip install --upgrade pip
           pip install -r requirements.txt
-          SETUP
-
-      - name: Apply migrations
-        run: |
-          echo "Applying database migrations..."
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'MIGRATE'
-          set -e
-          set -x
           
-          cd "${{ secrets.DEPLOY_DIR }}"
-          source venv/bin/activate
+          # Применение миграций с явным указанием параметров подключения
+          export PGHOST=localhost
+          export PGPORT=5432
+          export PGUSER=postgres
+          export PGPASSWORD=password
+          export PGDATABASE=testdb
           
-          # Создаем свежие миграции
-          python manage.py makemigrations
+          python manage.py migrate --noinput
           
-          # Применяем миграции в правильном порядке
-          python manage.py migrate contenttypes
-          python manage.py migrate auth
-          python manage.py migrate admin
-          python manage.py migrate sessions
-          python manage.py migrate
-          
-          # Создаем суперпользователя (если нужно)
+          # Создание суперпользователя
           echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser('admin', 'admin@example.com', 'password') if not User.objects.exists() else None" | python manage.py shell
           
-          echo "Collecting static files..."
+          # Сбор статики
           python manage.py collectstatic --noinput
-          MIGRATE
+          DEPLOY
 
-      - name: Restart application
+      - name: Restart services
         run: |
-          echo "Restarting application..."
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
-          set -e
-          set -x
-          sudo systemctl restart gunicorn.service
+          set -ex
+          sudo systemctl restart gunicorn
           sudo systemctl reload nginx
           RESTART
