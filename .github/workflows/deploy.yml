@@ -103,10 +103,35 @@ jobs:
         ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
+    - name: Reset environment
+      run: |
+        echo "Resetting environment..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+  
+          echo "Setting environment variables..."
+          export POSTGRES_USER="postgres"
+          export POSTGRES_PASSWORD="password"
+          export POSTGRES_DB="testdb"
+          export PROJECT_DIR="/home/deployer/Poleshko_diploma"
+  
+          # Drop database if exists
+          echo "Dropping database..."
+          psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS $POSTGRES_DB" || { echo "Error dropping database"; exit 1; }
+  
+          # Remove project directory if exists
+          echo "Removing project directory..."
+          rm -rf "$PROJECT_DIR" || { echo "Error removing project directory"; exit 1; }
+  
+          echo "Environment reset successfully."
+        EOF
+        echo "Environment reset on server."
+
     - name: Copy project files to server
       run: |
         echo "Copying project files to server..."
-        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"  # <---- Указываем опцию для ssh
+        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
         rsync -avz --delete --exclude '__pycache__' --exclude 'venv' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
         echo "Files copied."
 
@@ -114,8 +139,8 @@ jobs:
       run: |
         echo "Executing commands on server..."
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          set -e  # Выходить при первой ошибке
-          set -x  # Подробный вывод выполняемых команд
+          set -e
+          set -x
   
           echo "Setting environment variables..."
           export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
@@ -140,7 +165,6 @@ jobs:
           "$VENV_DIR/bin/pip" install -r requirements.txt || { echo "Error installing dependencies"; exit 1; }
   
           echo "Applying database migrations..."
-          # Try running all migrations
           "$VENV_DIR/bin/python" manage.py migrate || { echo "Error applying migrations"; exit 1; }
   
           echo "Collecting static files..."
