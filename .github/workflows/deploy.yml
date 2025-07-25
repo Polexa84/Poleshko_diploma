@@ -123,15 +123,30 @@ jobs:
           # Print current working directory
           pwd
   
+          echo "Ensuring python3 is available..."
+          # Check if 'python' command is available, if not, try 'python3'
+          if ! command -v python &> /dev/null
+          then
+              echo "Python command not found, trying python3..."
+              PYTHON_CMD="python3"
+          else
+              PYTHON_CMD="python"
+          fi
+          echo "Using python command: $PYTHON_CMD"
+  
           echo "Installing project dependencies..."
-          pip install --upgrade pip --break-system-packages
-          pip install -r requirements.txt --break-system-packages
+          # The '--break-system-packages' flag is still needed because the system's Python is managed externally.
+          # We are installing into the user's site-packages, which is okay for now.
+          $PYTHON_CMD -m pip install --upgrade pip --break-system-packages
+          $PYTHON_CMD -m pip install -r requirements.txt --break-system-packages
   
           echo "Applying database migrations..."
-          python manage.py migrate
+          # Use the detected python command for manage.py
+          $PYTHON_CMD manage.py migrate
   
           echo "Collecting static files..."
-          python manage.py collectstatic --noinput
+          # Use the detected python command for manage.py
+          $PYTHON_CMD manage.py collectstatic --noinput
   
           echo "Deployment commands executed successfully."
         EOF
