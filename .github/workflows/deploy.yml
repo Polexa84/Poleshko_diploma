@@ -133,17 +133,28 @@ jobs:
           echo "Installing project dependencies..."
           pip install -r requirements.txt
           
-        echo "Installing project dependencies..."
-        pip install -r requirements.txt
-        
-        echo "Creating initial database structure..."
-        python manage.py migrate --run-syncdb
-        
-        echo "Applying all migrations..."
-        python manage.py migrate
-        
-        echo "Collecting static files..."
-        python manage.py collectstatic --noinput
+          echo "Installing project dependencies..."
+          pip install -r requirements.txt
+          
+          echo "Applying core Django migrations first..."
+          python manage.py migrate auth
+          python manage.py migrate contenttypes
+          python manage.py migrate sessions
+          python manage.py migrate admin
+          
+          echo "Applying project migrations in correct order..."
+          python manage.py migrate users
+          python manage.py migrate restaurants
+          python manage.py migrate tables
+          python manage.py migrate bookings
+          
+          echo "Applying any remaining migrations..."
+          python manage.py migrate
+          
+          echo "Collecting static files..."
+          python manage.py collectstatic --noinput
+          
+          echo "Deployment commands executed successfully."
         
         echo "Deployment commands executed successfully."
 
