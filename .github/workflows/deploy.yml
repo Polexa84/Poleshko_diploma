@@ -109,37 +109,70 @@ jobs:
           export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"
           rsync -avz --delete \
             --exclude '__pycache__' \
+            --exclude '.env*' \
+            --exclude '.git' \
             --exclude 'venv' \
             . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
 
-      - name: Install dependencies and configure
+      - name: Deploy application
         run: |
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'DEPLOY'
           set -e
-          set -x
-          
+          cd "${{ secrets.DEPLOY_DIR }}"
+  
+          # Создаем .env.prod файл с вашими настройками
+          cat > .env.prod << 'ENV'
+          # ===== PostgreSQL =====
+          POSTGRES_DB_NAME=booking_system
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=новый_пароль
+          POSTGRES_HOST=localhost  # На сервере используем localhost вместо db
+          POSTGRES_PORT=5432
+  
+          # ===== Redis =====
+          REDIS_HOST=localhost  # На сервере используем localhost вместо redis
+          REDIS_PORT=6379
+          REDIS_DB=0
+  
+          # ===== Email =====
+          EMAIL_HOST=smtp.yandex.ru
+          EMAIL_PORT=465
+          EMAIL_HOST_USER=Elfinator84@yandex.ru
+          EMAIL_HOST_PASSWORD=xcsvzumxsevzgnea
+          EMAIL_USE_SSL=True
+          DEFAULT_FROM_EMAIL=Elfinator84@yandex.ru
+  
+          # ===== Django =====
+          DJANGO_SECRET_KEY=django-insecure-n\$u+0k-m02adu7=a*u9w+_dc@_a!qef@y1@^8w)=a\$7a2kyan^
+          DEBUG=False  # На продакшене выключаем debug
+          ALLOWED_HOSTS=ваш_домен,158.160.182.77,localhost
+  
+          # ===== Celery =====
+          CELERY_BROKER_URL=redis://localhost:6379/0
+          CELERY_RESULT_BACKEND=redis://localhost:6379/0
+          ENV
+  
           # Настройка PostgreSQL
-          echo "Configuring PostgreSQL..."
-          sudo sed -i 's/peer/md5/' /etc/postgresql/*/main/pg_hba.conf
+          sudo sed -i 's/local   all             postgres                                peer/local   all             postgres                                md5/' /etc/postgresql/*/main/pg_hba.conf
           sudo systemctl restart postgresql
-          
-          # Настройка проекта
-          cd "/home/deployer/Poleshko_diploma"
-          
-          # Python environment
-          python3 -m venv venv
+  
+          # Создаем venv если его нет
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+  
           source venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-          
-          # Static files
-          mkdir -p static
-          chmod 755 static
-          
-          # Database
-          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+  
+          # Применяем миграции
           python manage.py migrate
+  
+          # Собираем статику
+          mkdir -p static
           python manage.py collectstatic --noinput
+  
+          echo "Deployment completed successfully!"
           DEPLOY
 
       - name: Restart services
@@ -147,5 +180,7 @@ jobs:
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'RESTART'
           set -e
           sudo systemctl restart gunicorn
+          sudo systemctl restart celery
+          sudo systemctl restart celery-beat
           sudo systemctl reload nginx
           RESTART
