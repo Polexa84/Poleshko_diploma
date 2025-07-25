@@ -135,7 +135,6 @@ jobs:
           echo "Applying database migrations..."
           python manage.py migrate
           echo "Collecting static files..."
-          python manage.py collectstatic --noinput
           echo "Deployment commands executed successfully."
         EOF
         echo "Commands executed on server."
