@@ -3,7 +3,7 @@ from django.contrib.auth import login
 from .forms import UserRegistrationForm
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-import uuid
+from .services import send_confirmation_email # Импортируем сервис
 
 User = get_user_model()
 
@@ -11,17 +11,20 @@ def register(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save(request=request)
+            user = form.save()
             messages.success(request, 'Регистрация успешна! ...')
+
+            # Отправляем письмо с подтверждением
+            send_confirmation_email(user, request)
+
             return render(request, 'users/register_success.html')
         else:
             # Добавляем сообщение об ошибке
             messages.error(request, "Пожалуйста, исправьте ошибки ниже.")
-            return render(request, 'users/register.html', {'form': form})  #  Возвращаем render!!!
+            return render(request, 'users/register.html', {'form': form})
     else:
         form = UserRegistrationForm()
     return render(request, 'users/register.html', {'form': form})
-
 
 def confirm_email(request, token):
     try:
@@ -30,12 +33,12 @@ def confirm_email(request, token):
             user.is_active = True
             user.confirmation_token = None  # Очищаем токен
             user.save()
-            login(request, user)  # Автоматически логиним пользователя
-            messages.success(request, 'Email успешно подтвержден! Вы вошли в систему.')  # Добавляем сообщение об успехе
-            return render(request, 'users/confirmation_success.html')  # Страница успешного подтверждения
+            login(request, user)
+            messages.success(request, 'Email успешно подтвержден! Вы вошли в систему.')
+            return render(request, 'users/confirmation_success.html')
         else:
-            messages.info(request, 'Ваш email уже был подтвержден.')  # Добавляем информационное сообщение
-            return render(request, 'users/confirmation_already_confirmed.html')  # Страница, если уже подтверждено
+            messages.info(request, 'Ваш email уже был подтвержден.')
+            return render(request, 'users/confirmation_already_confirmed.html')
     except User.DoesNotExist:
-        messages.error(request, 'Неверная ссылка подтверждения.')  # Добавляем сообщение об ошибке
-        return render(request, 'users/confirmation_failed.html')  # Страница, если токен не найден
+        messages.error(request, 'Неверная ссылка подтверждения.')
+        return render(request, 'users/confirmation_failed.html')
