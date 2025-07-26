@@ -1,8 +1,10 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model  # Import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from .models import Restaurant, RestaurantImage, Slide
+
+User = get_user_model()  # Get the custom user model
 
 
 class RestaurantModelTest(TestCase):

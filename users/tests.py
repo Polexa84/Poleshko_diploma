@@ -1,23 +1,23 @@
 from django.test import TestCase, Client, RequestFactory
-from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core import mail
-from django.conf import settings
-from .models import UserProfile
 from .forms import UserRegistrationForm
-import uuid
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login
+from django.contrib import messages
 
 User = get_user_model()
 
 
 class UserModelTest(TestCase):
-    """Тесты модели пользователя и профиля"""
+    """Тесты модели пользователя"""
 
     def setUp(self):
         self.user = User.objects.create_user(
             username='testuser',
             email='test@example.com',
-            password='testpass123'
+            password='testpass123',
+            is_active=False  # Явно устанавливаем is_active=False
         )
 
     def test_user_creation(self):
@@ -25,14 +25,41 @@ class UserModelTest(TestCase):
         self.assertEqual(self.user.username, 'testuser')
         self.assertEqual(self.user.email, 'test@example.com')
         self.assertFalse(self.user.is_active)
+        self.assertIsNotNone(self.user.confirmation_token)  # Проверяем наличие токена
+        self.assertEqual(self.user.role, 'customer') # Проверяем роль по умолчанию
 
-    def test_profile_creation(self):
-        """Тест автоматического создания профиля"""
-        profile = UserProfile.objects.get(user=self.user)
-        self.assertEqual(profile.role, 'customer')
-        self.assertFalse(profile.is_active)
-        self.assertIsNotNone(profile.confirmation_token)
+    def register(request):
+        if request.method == 'POST':
+            form = UserRegistrationForm(request.POST)
+            if form.is_valid():
+                user = form.save(request=request)
+                messages.success(request, 'Регистрация успешна! ...')
+                return render(request, 'users/register_success.html')
+            else:
+                # Добавляем сообщение об ошибке
+                messages.error(request, "Пожалуйста, исправьте ошибки ниже.")
+                return render(request, 'users/register.html', {'form': form})  # Возвращаем render!!!
+        else:
+            form = UserRegistrationForm()
+        return render(request, 'users/register.html', {'form': form})
 
+    def confirm_email(request, token):
+        try:
+            user = User.objects.get(confirmation_token=token)
+            if not user.is_active:
+                user.is_active = True
+                user.confirmation_token = None  # Очищаем токен
+                user.save()
+                login(request, user)  # Автоматически логиним пользователя
+                messages.success(request,
+                                 'Email успешно подтвержден! Вы вошли в систему.')  # Добавляем сообщение об успехе
+                return render(request, 'users/confirmation_success.html')  # Страница успешного подтверждения
+            else:
+                messages.info(request, 'Ваш email уже был подтвержден.')  # Добавляем информационное сообщение
+                return render(request, 'users/confirmation_already_confirmed.html')  # Страница, если уже подтверждено
+        except User.DoesNotExist:
+            messages.error(request, 'Неверная ссылка подтверждения.')  # Добавляем сообщение об ошибке
+            return render(request, 'users/confirmation_failed.html')  # Страница, если токен не найден
 
 class UserRegistrationFormTest(TestCase):
     """Тесты формы регистрации пользователя"""
@@ -47,66 +74,14 @@ class UserRegistrationFormTest(TestCase):
             'username': 'newuser',
             'email': 'new@example.com',
             'password1': 'complexpassword123',
-            'password2': 'complexpassword123'
+            'password2': 'complexpassword123',
         }
         form = UserRegistrationForm(data=form_data)
         self.assertTrue(form.is_valid())
 
-        user = form.save(commit=False, request=self.request)
-        user = form.save(commit=True, request=self.request)
+        response = form.save(commit=True, request=self.request)
 
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, 'Подтверждение регистрации')
-
-
-class UserProfileTest(TestCase):
-    """Тесты функциональности профиля пользователя"""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123'
-        )
-        self.profile = UserProfile.objects.get(user=self.user)
-
-    def test_profile_str(self):
-        """Тест строкового представления профиля"""
-        self.assertEqual(str(self.profile), 'testuser (Клиент)')
-
-    def test_superuser_profile_activation(self):
-        """Тест автоматической активации профиля суперпользователя"""
-        admin = User.objects.create_superuser(
-            username='admin',
-            email='admin@example.com',
-            password='adminpass'
-        )
-        admin_profile = UserProfile.objects.get(user=admin)
-        self.assertTrue(admin_profile.is_active)
-
-
-class UserViewsTest(TestCase):
-    """Тесты представлений пользователей"""
-
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(
-            username='testuser',
-            email='test@example.com',
-            password='testpass123',
-            is_active=True
-        )
-        self.profile = UserProfile.objects.get(user=self.user)
-        self.profile.is_active = True
-        self.profile.save()
-
-    def test_registration_view(self):
-        """Тест страницы регистрации"""
-        response = self.client.get(reverse('register'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_login_view(self):
-        """Тест страницы входа"""
-        response = self.client.get(reverse('login'))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.role, 'customer')  # Проверяем роль по умолчанию

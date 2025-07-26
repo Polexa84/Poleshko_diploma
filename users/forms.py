@@ -25,14 +25,14 @@ class UserRegistrationForm(UserCreationForm):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
         user.is_active = False # Неактивен по умолчанию
+        user.role = User.USER_ROLE_CUSTOMER  # Устанавливаем роль по умолчанию!!!
+        user.confirmation_token = uuid.uuid4() # Генерируем токен прямо здесь
 
         if commit:
-            user.confirmation_token = uuid.uuid4() # Генерируем токен прямо здесь
             user.save()
 
             # Отправляем письмо с подтверждением
             subject = 'Подтверждение регистрации'
-            # используем request для формирования абсолютного URL
             confirmation_url = request.build_absolute_uri(reverse('confirm_email', args=[str(user.confirmation_token)]))
             message = f'Здравствуйте, {user.username}!\n\nПожалуйста, подтвердите свой email, перейдя по ссылке: {confirmation_url}\n\nС уважением, Администрация'
             from_email = settings.DEFAULT_FROM_EMAIL
