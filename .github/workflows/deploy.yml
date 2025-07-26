@@ -168,3 +168,4 @@ jobs:
           sudo systemctl reload nginx  # Перезагрузка Nginx
         EOF
         echo "Application restarted."
+        
