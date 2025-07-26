@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Мои бронирования{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Мои бронирования</h1>
+        {% if bookings %}
+            <ul>
+                {% for booking in bookings %}
+                    <li>
+                        Стол #{{ booking.table.number }} в {{ booking.table.restaurant.name }} - {{ booking.booking_time|date:"d.m.Y H:i" }} ({{ booking.duration|time:"H:i" }})
+                        <a href="{% url 'delete_booking' booking.id %}" class="btn btn-danger btn-sm" style="margin-left: 10px;">Удалить</a>  {#  Добавлена кнопка Удалить #}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>У вас пока нет бронирований.</p>
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,171 @@
+name: Django CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - develop_1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb1
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB_NAME: testdb1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Wait for PostgreSQL
+      run: |
+        for i in {1..15}; do
+          if pg_isready -h localhost -p 5432 -U postgres -d testdb; then
+            echo "PostgreSQL ready!"
+            exit 0
+          fi
+          echo "Waiting for PostgreSQL... ($i/15)"
+          sleep 2
+        done
+        echo "PostgreSQL not ready!"
+        exit 1
+
+    - name: Set up database
+      working-directory: .
+      run: python manage.py migrate
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_DB: testdb1
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+
+    - name: Run tests
+      working-directory: .
+      run: python manage.py test --settings=booking_system.settings
+      env:
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_DB: testdb1
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: password
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_KEY }}
+
+    - name: Add server host key to known_hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Copy project files to server
+      run: |
+        echo "Copying project files to server..."
+        export RSYNC_RSH="ssh -o StrictHostKeyChecking=no"  # <---- Указываем опцию для ssh
+        rsync -avz --delete --exclude '__pycache__' . ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:${{ secrets.DEPLOY_DIR }}
+        echo "Files copied."
+
+    - name: Install dependencies, apply migrations, collect static files
+      run: |
+        echo "Executing commands on server..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e  # Выходить при первой ошибке
+          set -x  # Подробный вывод выполняемых команд
+          echo "Changing directory to deployment folder..."
+          export DJANGO_SECRET_KEY="${{ secrets.DJANGO_SECRET_KEY }}"
+          export POSTGRES_USER="postgres" # <---- Добавляем переменные для базы данных
+          export POSTGRES_PASSWORD="password" # <---- Добавляем переменные для базы данных
+          export POSTGRES_DB="testdb1" # <---- Добавляем переменные для базы данных
+
+          PROJECT_DIR="/home/deployer/Poleshko_diploma"
+          cd "$PROJECT_DIR"
+
+          echo "Creating virtual environment..."
+          python3 -m venv venv  # <---- Создаем виртуальное окружение
+          echo "Activating virtual environment..."
+          source /home/deployer/Poleshko_diploma/venv/bin/activate
+
+          echo "Installing project dependencies..."
+          pip install -r requirements.txt
+          
+          echo "Installing project dependencies..."
+          pip install -r requirements.txt
+          
+          echo "Applying core Django migrations first..."
+          python manage.py migrate auth
+          python manage.py migrate contenttypes
+          python manage.py migrate sessions
+          python manage.py migrate admin
+          
+          echo "Applying project migrations in correct order..."
+          python manage.py migrate users
+          python manage.py migrate restaurants
+          python manage.py migrate tables
+          python manage.py migrate bookings
+          
+          echo "Applying any remaining migrations..."
+          python manage.py migrate
+          
+          echo "Collecting static files..."
+          python manage.py collectstatic --noinput
+          
+          echo "Deployment commands executed successfully."
+        
+        echo "Deployment commands executed successfully."
+
+    - name: Restart application
+      run: |
+        echo "Restarting application..."
+        ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          set -e
+          set -x
+          sudo systemctl restart gunicorn.service  # Имя сервиса
+          sudo systemctl reload nginx  # Перезагрузка Nginx
+        EOF
+        echo "Application restarted."
+        

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load static %}
+
+    {% block content %}
+        <div class="container">
+            <h1>Подтверждение бронирования</h1>
+            <p>Пожалуйста, подтвердите бронирование столика №{{ table.number }} в ресторане {{ restaurant.name }} на {{ booking_time }}.</p>
+
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">Подтвердить</button>
+            </form>
+            <a href="{% url 'restaurant_booking' restaurant.id %}?table={{ table.id }}" class="btn btn-secondary">Отменить</a>
+        </div>
+    {% endblock %}

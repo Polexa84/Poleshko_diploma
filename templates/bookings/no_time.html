@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container">
+        <h1>Нет доступного времени</h1>
+        <p>К сожалению, на выбранную дату нет доступного времени для бронирования.</p>
+        <a href="{% url 'restaurant_detail' restaurant.id %}" class="btn btn-primary">Вернуться к ресторану</a>
+    </div>
+{% endblock %}

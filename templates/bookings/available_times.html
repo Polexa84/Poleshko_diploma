@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container">
+        <h1>Выберите время бронирования</h1>
+
+        {% if error_message %}
+            <div class="alert alert-danger">
+                {{ error_message }}
+            </div>
+        {% endif %}
+
+        {% if available_times %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                <div class="mb-3">
+                    <h5>Доступное время:</h5>
+                    {% for time_slot in available_times %}
+                        <button type="submit" name="booking_time" value="{{ time_slot.start_time }}" class="btn btn-outline-primary">{{ time_slot.display_time }}</button>
+                    {% endfor %}
+                </div>
+            </form>
+        {% else %}
+            <p>Нет доступного времени для бронирования столика на выбранную дату.</p>
+        {% endif %}
+
+        <a href="{% url 'restaurant_booking' restaurant.id %}?table={{ selected_table.id }}" class="btn btn-secondary">Изменить дату</a>
+    </div>
+{% endblock %}
