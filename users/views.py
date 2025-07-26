@@ -2,7 +2,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from .forms import UserRegistrationForm
 from django.contrib import messages
-from .models import UserProfile
 from django.contrib.auth import get_user_model
 import uuid
 
@@ -26,19 +25,17 @@ def register(request):
 
 def confirm_email(request, token):
     try:
-        profile = UserProfile.objects.get(confirmation_token=token)
-        user = profile.user
+        user = User.objects.get(confirmation_token=token)
         if not user.is_active:
             user.is_active = True
+            user.confirmation_token = None  # Очищаем токен
             user.save()
-            profile.confirmation_token = uuid.uuid4()
-            profile.save()
             login(request, user)  # Автоматически логиним пользователя
             messages.success(request, 'Email успешно подтвержден! Вы вошли в систему.')  # Добавляем сообщение об успехе
             return render(request, 'users/confirmation_success.html')  # Страница успешного подтверждения
         else:
             messages.info(request, 'Ваш email уже был подтвержден.')  # Добавляем информационное сообщение
             return render(request, 'users/confirmation_already_confirmed.html')  # Страница, если уже подтверждено
-    except UserProfile.DoesNotExist:
+    except User.DoesNotExist:
         messages.error(request, 'Неверная ссылка подтверждения.')  # Добавляем сообщение об ошибке
         return render(request, 'users/confirmation_failed.html')  # Страница, если токен не найден

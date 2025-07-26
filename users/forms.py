@@ -1,12 +1,11 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
 from django.core.mail import send_mail
 from django.conf import settings
 from django.urls import reverse
 import uuid
 from django.core.validators import EmailValidator
-from .models import UserProfile  # Добавлено
 
 User = get_user_model()
 
@@ -25,19 +24,16 @@ class UserRegistrationForm(UserCreationForm):
     def save(self, commit=True, request=None):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
-        user.is_active = False
+        user.is_active = False # Неактивен по умолчанию
 
         if commit:
+            user.confirmation_token = uuid.uuid4() # Генерируем токен прямо здесь
             user.save()
-            profile = UserProfile.objects.get(user=user) # Получаем профиль, созданный сигналом
-            confirmation_token = uuid.uuid4()
-            profile.confirmation_token = confirmation_token
-            profile.save()
 
             # Отправляем письмо с подтверждением
             subject = 'Подтверждение регистрации'
             # используем request для формирования абсолютного URL
-            confirmation_url = request.build_absolute_uri(reverse('confirm_email', args=[str(confirmation_token)]))
+            confirmation_url = request.build_absolute_uri(reverse('confirm_email', args=[str(user.confirmation_token)]))
             message = f'Здравствуйте, {user.username}!\n\nПожалуйста, подтвердите свой email, перейдя по ссылке: {confirmation_url}\n\nС уважением, Администрация'
             from_email = settings.DEFAULT_FROM_EMAIL
             recipient_list = [user.email]

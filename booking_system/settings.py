@@ -7,7 +7,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+
 DEBUG = True
+
+AUTH_USER_MODEL = 'users.User'
 
 ALLOWED_HOSTS = []
 
