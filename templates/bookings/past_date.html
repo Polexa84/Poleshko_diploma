@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="container">
+        <h1>Ошибка</h1>
+        <p>Вы не можете выбрать прошедшую дату для бронирования.</p>
+        <a href="{% url 'restaurant_booking' restaurant.id %}" class="btn btn-primary">Выбрать другую дату</a>
+    </div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Подтверждение удаления столика{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Подтверждение удаления столика</h1>
+        <p>Вы уверены, что хотите удалить столик №{{ table.number }} из ресторана {{ table.restaurant.name }}?</p>
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Удалить</button>
+            <a href="{% url 'restaurant_detail' table.restaurant.id %}" class="btn btn-secondary">Отмена</a>
+        </form>
+    </div>
+{% endblock %}

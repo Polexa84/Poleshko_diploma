@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container">
+        <h1>Ошибка бронирования</h1>
+        <p>К сожалению, при бронировании произошла ошибка:</p>
+        <p><strong>{{ error }}</strong></p>
+        <p>Пожалуйста, попробуйте еще раз позже или свяжитесь с нами.</p>
+        <a href="{% url 'restaurant_list' %}" class="btn btn-primary">Вернуться к списку ресторанов</a>
+    </div>
+{% endblock %}
