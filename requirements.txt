@@ -6,15 +6,21 @@ bcc==0.1.10
 bcrypt==4.3.0
 blinker==1.9.0
 celery[redis]==5.3.6  # celery с redis transport
+coverage==7.10.1
 crispy-bootstrap5==2025.6
 Django==5.2.4
 django-crispy-forms==2.4
+django-extensions==4.1
 django-widget-tweaks==1.5.0
+django_coverage_plugin==3.1.1
 dotenv==0.9.9
-gunicorn # Добавлено gunicorn
+graphviz==0.21
+gunicorn  # Добавлено gunicorn
 numpy==2.2.4
 pillow==11.3.0
 psycopg2-binary==2.9.10
+pydotplus==2.0.2
+pyparsing==3.2.3
 python-dotenv==1.1.0
 redis  # redis, установит последнюю версию
 sqlparse==0.5.3
