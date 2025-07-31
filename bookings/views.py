@@ -79,46 +79,53 @@ def available_times(request, restaurant_id, table_id):
                         'error_message': "Выбранное время уже забронировано. Пожалуйста, выберите другое время."
                     })
                 else:
-                    #  Сохраняем данные бронирования
-                    request.session['booking_data'] = {
-                        'restaurant_id': restaurant.id,
-                        'table_id': table.id,
-                        'booking_time': booking_time.isoformat(),  #  Сохраняем в формате ISO
-                        'user_id': request.user.id
-                    }
-
                     # Генерируем токен подтверждения
                     confirmation_token = uuid.uuid4()
-                    request.session['confirmation_token'] = str(confirmation_token)  # Store token in session
+
+                    # Создаем объект Booking и сохраняем в базе данных
+                    booking = Booking(
+                        restaurant=restaurant,
+                        table=table,
+                        user=request.user,
+                        booking_time=booking_time,
+                        confirmation_token=confirmation_token,
+                        is_confirmed=False  # Бронирование изначально не подтверждено
+                    )
+                    booking.save()  # Сохраняем в базу данных!
+
+                    # Генерируем ссылку подтверждения
+                    confirmation_url = request.build_absolute_uri(
+                        reverse('confirm_booking', args=[str(confirmation_token)])
+                    )
+
                     # Отправляем письмо с подтверждением
-                    confirmation_url = request.build_absolute_uri(reverse('confirm_booking', args=[str(confirmation_token)]))
                     subject = 'Подтверждение бронирования'
                     message = f'Здравствуйте, {request.user.username}!\n\nПодтвердите бронирование столика #{table.number} в ресторане {restaurant.name} на {booking_time.strftime("%d.%m.%Y %H:%M")}, перейдя по ссылке: {confirmation_url}.\n\nСпасибо за выбор нашего ресторана!'
                     from_email = settings.DEFAULT_FROM_EMAIL
-                    recipient_list = [request.user.email]  # Отправляем письмо на email пользователя
-                    send_mail(subject, message, from_email, recipient_list, fail_silently=False) # Изменяем fail_silently
+                    recipient_list = [request.user.email]
+                    send_mail(subject, message, from_email, recipient_list, fail_silently=False)
                     print("Email sent successfully!")
-                    messages.success(request, "Бронирование запрошено! Пожалуйста, проверьте свою электронную почту для подтверждения.")  # Сообщение об успехе
-                    return redirect('booking_pending')
-            else:
-                available_times_list = generate_available_times(restaurant, table, selected_date) # Pass table instead of selected_table
 
+                    messages.success(request, "Бронирование запрошено! Пожалуйста, проверьте свою электронную почту для подтверждения.")
+                    return redirect('booking_pending') # больше не нужно передавать токен - берем из базы данных
+            else:
+                available_times_list = generate_available_times(restaurant, table, selected_date)
                 return render(request, 'bookings/available_times.html', {
                     'restaurant': restaurant,
-                    'selected_table': table, # Pass table instead of selected_table
+                    'selected_table': table,
                     'available_times': available_times_list,
                     'selected_date': selected_date,
                     'error_message': "Пожалуйста, выберите время."
                 })
         else:
-             available_times_list = generate_available_times(restaurant, table, selected_date)  # Pass table instead of selected_table
-             return render(request, 'bookings/available_times.html', {
-                 'restaurant': restaurant,
-                 'selected_table': table,  # Pass table instead of selected_table
-                 'available_times': available_times_list,
-                 'selected_date': selected_date,
-                 'error_message': "Форма не валидна."
-             })
+            available_times_list = generate_available_times(restaurant, table, selected_date)
+            return render(request, 'bookings/available_times.html', {
+                'restaurant': restaurant,
+                'selected_table': table,
+                'available_times': available_times_list,
+                'selected_date': selected_date,
+                'error_message': "Форма не валидна."
+            })
     else:
         selected_date_str = request.GET.get('date', timezone.now().date().strftime('%Y-%m-%d'))
         try:
@@ -126,10 +133,10 @@ def available_times(request, restaurant_id, table_id):
         except ValueError:
             return render(request, 'bookings/invalid_date.html', {'restaurant': restaurant})
 
-    available_times_list = generate_available_times(restaurant, table, selected_date) # Pass table instead of selected_table
+    available_times_list = generate_available_times(restaurant, table, selected_date)
     return render(request, 'bookings/available_times.html', {
         'restaurant': restaurant,
-        'selected_table': table,  # Pass table instead of selected_table
+        'selected_table': table,
         'available_times': available_times_list,
         'selected_date': selected_date,
     })
@@ -221,42 +228,35 @@ def delete_booking(request, booking_id):
     return render(request, 'bookings/confirm_delete.html', {'booking': booking})  #  Подтверждаем удаление
 
 def confirm_booking(request, token):
+    """Подтверждает бронирование по токену."""
     try:
-        confirmation_token = request.session.get('confirmation_token')
+        # 1. Поиск бронирования по токену
+        booking = Booking.objects.get(confirmation_token=token)
 
-        if str(token) != confirmation_token:
-            messages.error(request, "Неверная ссылка подтверждения.")
-            return render(request, 'bookings/booking_confirmation_failed.html')
+        # 2. Проверка, не истекло ли время бронирования (опционально)
+        if booking.booking_time < timezone.now():
+            messages.error(request, "Время бронирования истекло.")
+            return redirect('booking_failed')
 
-        booking_data = request.session.get('booking_data')
-        if not booking_data:
-            messages.error(request, "Данные бронирования не найдены. Пожалуйста, попробуйте еще раз.")
-            return redirect('some_error_page')  # Redirect to an error page or the booking form
+        # 3. Подтверждаем бронирование
+        booking.is_confirmed = True
+        booking.save()
 
-        #  Извлекаем данные из сессии
-        restaurant_id = booking_data['restaurant_id']
-        table_id = booking_data['table_id']
-        booking_time_iso = booking_data['booking_time']
-        user_id = booking_data['user_id']
-        booking_time = datetime.fromisoformat(booking_time_iso)  #  Преобразуем обратно в datetime
+        messages.success(request, "Бронирование успешно подтверждено!")
+        return redirect('booking_success')
 
-        restaurant = get_object_or_404(Restaurant, id=restaurant_id)
-        table = get_object_or_404(Table, id=table_id)
-        user = get_object_or_404(User, id=user_id)
-
-        #  Создаем бронирование
-        booking = Booking.objects.create(restaurant=restaurant, table=table, user=user, booking_time=booking_time, is_confirmed=True)
-        messages.success(request, "Бронирование успешно подтверждено!") # Уведомляем об успехе
-
-        #  Удаляем данные из сессии
-        del request.session['booking_data']
-        del request.session['confirmation_token']
-
-        return render(request, 'bookings/booking_confirmed.html')
-    except Exception as e:
-        messages.error(request, f"Произошла ошибка при подтверждении бронирования: {e}")  # Сообщаем об ошибке
-        print(f"Error in confirm_booking: {e}")
-        return render(request, 'bookings/booking_confirmation_failed.html')
+    except Booking.DoesNotExist:
+        print(f"ОШИБКА: Не найдено бронирование с токеном: {token}") # Add logging!
+        messages.error(request, "Неверная ссылка подтверждения.")
+        return redirect('booking_failed')
+    except Exception as e:  # Ловим все остальные исключения
+        messages.error(request, f"Произошла ошибка: {e}")
+        # Optionally, log the error here
+        return redirect('booking_failed')
 
 def booking_pending(request):
     return render(request, 'bookings/booking_pending.html')
+
+def booking_failed(request):
+    """Отображает страницу с информацией об ошибке подтверждения бронирования."""
+    return render(request, 'bookings/booking_failed.html')

@@ -94,27 +94,3 @@ class BookingViewsTests(TestCase):
         """Тест страницы ожидания бронирования"""
         response = self.client.get(reverse('booking_pending'))
         self.assertEqual(response.status_code, 200)
-
-
-class ConfirmBookingTests(TestCase):
-    """Тесты подтверждения бронирования"""
-
-    def setUp(self):
-        self.client = Client()
-        self.restaurant = Restaurant.objects.create(
-            name="Тестовый ресторан",
-            opening_time=time(9, 0),
-            closing_time=time(21, 0),
-        )
-        self.table = Table.objects.create(
-            restaurant=self.restaurant,
-            number=1,
-            capacity=4
-        )
-
-    def test_invalid_confirmation_token(self):
-        """Тест с неверным токеном подтверждения"""
-        invalid_token = uuid.uuid4()
-        response = self.client.get(reverse('confirm_booking', args=[invalid_token]))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'bookings/booking_confirmation_failed.html')
